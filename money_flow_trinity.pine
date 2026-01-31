@@ -217,25 +217,14 @@ plot(ema144, "EMA 144", color=above_ema144 ? color.lime : color.red, linewidth=3
 plot(ema233, "EMA 233", color=above_ema233 ? color.lime : color.red, linewidth=4, force_overlay=true)
 
 // ==========================================
-// 7. WARNING ICONS
+// 7. CẢNH BÁO (CHỈ ICONS QUAN TRỌNG)
 // ==========================================
 
-// 🚦 VOLUME KIỆT SỨC (Exhaustion) - Chỉ khi bật và Vol > ngưỡng
-plotshape(i_vSpikeLb and is_vol_exhaustion, "🚦 Vol Kiệt sức", shape.circle, location.abovebar, color.new(color.red, 0), text="🚦", size=size.small, force_overlay=true)
+// 🚦 VOLUME KIỆT SỨC - Volume cực cao, có thể đỉnh/đáy
+plotshape(i_vSpikeLb and is_vol_exhaustion, "🚦 Vol Kiệt", shape.circle, location.abovebar, color.red, text="🚦", size=size.tiny, force_overlay=true)
 
-// ⚡ BIẾN ĐỘNG LỎNG LẺO (High ATR) - Chỉ khi bật và Spread > ngưỡng ATR
-plotshape(i_hATRLb and is_high_volatility, "⚡ Biến động", shape.diamond, location.abovebar, color.new(color.yellow, 0), text="⚡", size=size.small, force_overlay=true)
-
-// VSA Icons
-plotshape(is_shakeout or is_spring, "Spring/Shakeout", shape.diamond, location.belowbar, color.aqua, size=size.small, force_overlay=true)
-plotshape(accumulation_sign, "Accumulation", shape.triangleup, location.belowbar, color.lime, text="💰", size=size.tiny, force_overlay=true)
-plotshape(hidden_distribution, "Hidden Dist", shape.triangledown, location.abovebar, color.orange, text="⚠️", size=size.tiny, force_overlay=true)
-plotshape(is_upthrust, "Upthrust", shape.xcross, location.abovebar, color.red, size=size.small, force_overlay=true)
-
-// RSI Divergence Icons
-plotshape(hidden_bullish[pivot_lookback], "Hidden Bullish Div", shape.labelup, location.belowbar, color.blue, text="HD", size=size.small, force_overlay=true)
-plotshape(regular_bullish[pivot_lookback], "Regular Bullish Div", shape.labelup, location.belowbar, color.purple, text="RD", size=size.small, force_overlay=true)
-plotshape(regular_bearish[pivot_lookback], "Bearish Div", shape.labeldown, location.abovebar, color.red, text="BD", size=size.small, force_overlay=true)
+// ⚡ BIẾN ĐỘNG MẠNH - Spread lớn bất thường  
+plotshape(i_hATRLb and is_high_volatility and not is_vol_exhaustion, "⚡ Biến động", shape.diamond, location.abovebar, color.yellow, text="⚡", size=size.tiny, force_overlay=true)
 
 // ==========================================
 // 8. TÍN HIỆU MUA/BÁN
