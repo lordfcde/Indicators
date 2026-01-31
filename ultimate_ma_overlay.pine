@@ -1,0 +1,82 @@
+//@version=5
+// Coder Stock - Ultimate MA Overlay
+// Tích hợp với Money Trinity - Hiển thị trên đồ thị giá
+indicator(title="CS Ultimate MA Overlay", shorttitle="CS_MA", overlay=true)
+
+// ==========================================
+// CẤU HÌNH
+// ==========================================
+grp_ma1 = "MA Chính (Fast)"
+len1 = input.int(20, "Length", group=grp_ma1)
+type1 = input.int(2, "Type (1=SMA,2=EMA,3=WMA,4=Hull,5=VWMA,6=RMA,7=TEMA)", minval=1, maxval=7, group=grp_ma1)
+smoothe1 = input.int(2, "Color Smoothing", minval=1, maxval=10, group=grp_ma1)
+
+grp_ma2 = "MA Phụ (Slow) - Tùy chọn"
+show_ma2 = input.bool(true, "Hiện MA thứ 2?", group=grp_ma2)
+len2 = input.int(50, "Length", group=grp_ma2)
+type2 = input.int(1, "Type", minval=1, maxval=7, group=grp_ma2)
+
+grp_cross = "Giao cắt MA"
+show_cross = input.bool(true, "Hiện điểm giao cắt?", group=grp_cross)
+
+// ==========================================
+// TÍNH TOÁN MA
+// ==========================================
+hullma(src, len) =>
+    ta.wma(2*ta.wma(src, len/2)-ta.wma(src, len), math.round(math.sqrt(len)))
+
+tema(src, len) =>
+    ema1 = ta.ema(src, len)
+    ema2 = ta.ema(ema1, len)
+    ema3 = ta.ema(ema2, len)
+    3 * (ema1 - ema2) + ema3
+
+get_ma(src, len, type) =>
+    switch type
+        1 => ta.sma(src, len)
+        2 => ta.ema(src, len)
+        3 => ta.wma(src, len)
+        4 => hullma(src, len)
+        5 => ta.vwma(src, len)
+        6 => ta.rma(src, len)
+        7 => tema(src, len)
+        => ta.ema(src, len)
+
+ma1 = get_ma(close, len1, type1)
+ma2 = get_ma(close, len2, type2)
+
+// MA Direction
+ma1_up = ma1 >= ma1[smoothe1]
+ma1_down = ma1 < ma1[smoothe1]
+
+// ==========================================
+// HIỂN THỊ
+// ==========================================
+// MA1 - Đường chính (đổi màu theo hướng)
+col1 = ma1_up ? color.lime : color.red
+plot(ma1, title="MA Fast", color=col1, linewidth=3)
+
+// MA2 - Đường phụ
+col2 = ma2 >= ma2[smoothe1] ? color.new(color.blue, 30) : color.new(color.orange, 30)
+plot(show_ma2 ? ma2 : na, title="MA Slow", style=plot.style_circles, color=col2, linewidth=2)
+
+// Điểm giao cắt
+cross_up = ta.crossover(ma1, ma2)
+cross_down = ta.crossunder(ma1, ma2)
+
+plotshape(show_cross and cross_up ? ma1 : na, title="Golden Cross", style=shape.diamond, location=location.absolute, color=color.yellow, size=size.small)
+plotshape(show_cross and cross_down ? ma1 : na, title="Death Cross", style=shape.diamond, location=location.absolute, color=color.fuchsia, size=size.small)
+
+// ==========================================
+// FILL VÙNG (Xu hướng rõ ràng hơn)
+// ==========================================
+fill_color = ma1 > ma2 ? color.new(color.lime, 90) : color.new(color.red, 90)
+p1 = plot(ma1, display=display.none)
+p2 = plot(show_ma2 ? ma2 : na, display=display.none)
+fill(p1, p2, color=show_ma2 ? fill_color : na)
+
+// ==========================================
+// ALERTS
+// ==========================================
+alertcondition(cross_up, title="Golden Cross", message="MA Fast cắt lên MA Slow - Xu hướng TĂNG")
+alertcondition(cross_down, title="Death Cross", message="MA Fast cắt xuống MA Slow - Xu hướng GIẢM")

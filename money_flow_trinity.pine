@@ -1,158 +1,286 @@
 //@version=5
-// Coder Stock - Money Flow Trinity (Ultimate Fix)
-// Đã sửa lỗi: ta.eom (tính thủ công) và table.cell (text_halign)
-indicator(title="Coder Stock - Money Flow Trinity Fixed", shorttitle="CS_Money_Trinity", format=format.price, precision=2)
+// Coder Stock - Money Flow Trinity Master (Wyckoff VSA Edition)
+// Tích hợp: CMF + Chaikin + EOM + Wyckoff VSA Analysis
+// Features: Candle Coloring, Volume Climax, Shakeout Detection, Effort vs Result
+// Author: Vinh
+indicator(title="CS Trinity Master VSA", shorttitle="CS_Trinity_VSA", format=format.price, precision=2)
 
 // ==========================================
-// 1. CẤU HÌNH THÔNG SỐ
+// 1. CẤU HÌNH
 // ==========================================
+grp_cmf = "1. CMF (Dòng Tiền)"
+cmf_len = input.int(20, "CMF Length", group=grp_cmf)
 
-grp_cmf = "1. CMF (QUAN TRỌNG NHẤT - HẠNG 1)"
-cmf_len = input.int(20, "Độ dài CMF", group=grp_cmf)
+grp_ck = "2. Chaikin Oscillator"
+ck_fast = input.int(3, "Fast", group=grp_ck)
+ck_slow = input.int(10, "Slow", group=grp_ck)
 
-grp_ck = "2. Chaikin Osc (HẠNG 2)"
-ck_fast = input.int(3, "Fast Length", group=grp_ck)
-ck_slow = input.int(10, "Slow Length", group=grp_ck)
+grp_eom = "3. EOM"
+eom_len = input.int(14, "Length", group=grp_eom)
+eom_div = input.int(10000, "Divisor", group=grp_eom)
 
-grp_eom = "3. EOM (HẠNG 3)"
-eom_len = input.int(14, "EOM Length", group=grp_eom)
-eom_div = input.int(10000, "Divisor (Hệ số chia)", group=grp_eom, tooltip="Hệ số chia Volume để tính EOM. Giữ nguyên 10000.")
+grp_vsa = "4. Wyckoff VSA"
+vol_climax_mult = input.float(2.0, "Volume Climax (x TB)", group=grp_vsa, tooltip="Volume > X lần trung bình = Climax")
+vol_dry_mult = input.float(0.5, "Volume Cạn (x TB)", group=grp_vsa, tooltip="Volume < X lần trung bình = Cạn")
+spread_narrow = input.float(0.5, "Spread Hẹp (x ATR)", group=grp_vsa)
 
-// --- CẤU HÌNH LỌC NHIỄU (Anti-Noise) ---
-use_filter = input.bool(true, "Bật lọc nhiễu CMF?", group="4. Bộ Lọc Tín Hiệu")
-min_val    = input.float(0.05, "Ngưỡng CMF an toàn", step=0.01, group="4. Bộ Lọc Tín Hiệu")
-min_dur    = input.int(3, "Số phiên Xanh liên tiếp", minval=1, group="4. Bộ Lọc Tín Hiệu")
-
-// --- CẤU HÌNH VOLUME (Chống giả) ---
-use_vol    = input.bool(true, "Lọc Volume?", group="5. Bộ Lọc Khối Lượng")
-vol_mult   = input.float(1.0, "Hệ số Vol (x Trung bình)", step=0.1, group="5. Bộ Lọc Khối Lượng")
-
-// --- CẤU HÌNH MUA SỚM (Bắt đáy) ---
-use_early  = input.bool(true, "Hiện điểm Mua Sớm?", group="6. Cấu Hình Mua Sớm")
+grp_cooldown = "5. Chống Nhiễu"
+sell_cooldown = input.int(3, "Cooldown BÁN", minval=1, group=grp_cooldown)
+buy_cooldown = input.int(3, "Cooldown MUA", minval=1, group=grp_cooldown)
 
 // ==========================================
-// 2. TÍNH TOÁN (CORE LOGIC)
+// 2. TÍNH TOÁN CORE
 // ==========================================
 
-// --- A. CMF (CHAIKIN MONEY FLOW) ---
+// --- CMF ---
 ad_val = close==high and close==low or high==low ? 0 : ((2*close-low-high)/(high-low))*volume
 mf = math.sum(ad_val, cmf_len) / math.sum(volume, cmf_len)
 
-// --- B. CHAIKIN OSCILLATOR ---
-// Công thức: EMA3 - EMA10 của đường A/D
+// --- Chaikin ---
 ad_line = ta.accdist
 ck_raw = ta.ema(ad_line, ck_fast) - ta.ema(ad_line, ck_slow)
 
-// --- C. EOM (EASE OF MOVEMENT - TÍNH THỦ CÔNG) ---
-// 1. Tính khoảng cách di chuyển (Distance Moved)
+// --- EOM ---
 dm = ((high + low) / 2) - ((high[1] + low[1]) / 2)
-// 2. Tính tỷ lệ hộp (Box Ratio) - Có xử lý chia cho 0
 br = (volume / eom_div) / ((high - low) != 0 ? (high - low) : 1)
-// 3. Tính EOM thô
 eom_inst = br != 0 ? dm / br : 0
-// 4. Làm mượt EOM (SMA)
 eom_raw = ta.sma(eom_inst, eom_len)
 
+// --- EMAs ---
+ema50 = ta.ema(close, 50)
+ema144 = ta.ema(close, 144)
+ema233 = ta.ema(close, 233)
+
+above_ema50 = close > ema50
+above_ema144 = close > ema144
+above_ema233 = close > ema233
+ema_count_above = (above_ema50 ? 1 : 0) + (above_ema144 ? 1 : 0) + (above_ema233 ? 1 : 0)
+resistance_count = 3 - ema_count_above
+
 // ==========================================
-// 3. AUTO-SCALING (PHÉP THUẬT PHÓNG TO)
+// 3. WYCKOFF VSA ANALYSIS
+// ==========================================
+
+// --- Volume Analysis ---
+vol_sma = ta.sma(volume, 20)
+vol_ratio = volume / vol_sma
+
+// Volume States
+is_vol_climax = vol_ratio >= vol_climax_mult     // 🚦 Volume Kiệt sức/Climax
+is_vol_high = vol_ratio >= 1.5 and vol_ratio < vol_climax_mult  // High Vol
+is_vol_normal = vol_ratio >= 0.8 and vol_ratio < 1.5
+is_vol_dry = vol_ratio < vol_dry_mult            // Cạn Volume
+
+// --- Spread Analysis (Độ rộng nến) ---
+atr_val = ta.atr(14)
+spread = high - low
+is_spread_wide = spread > atr_val * 1.5
+is_spread_narrow = spread < atr_val * spread_narrow
+is_spread_normal = not is_spread_wide and not is_spread_narrow
+
+// --- Candle Character ---
+is_bullish = close > open
+is_bearish = close < open
+close_position = (close - low) / (high - low)  // 0 = close ở đáy, 1 = close ở đỉnh
+
+// --- EFFORT vs RESULT (Nỗ lực vs Kết quả) ---
+// High Effort = Volume cao
+// Result = Spread (độ rộng nến)
+
+// Nỗ lực lớn, kết quả nhỏ -> Cảnh báo (có thể phân phối ẩn hoặc tích lũy)
+effort_no_result_up = is_vol_climax and is_bullish and is_spread_narrow  // Vol cao, nến xanh nhưng spread hẹp
+effort_no_result_down = is_vol_climax and is_bearish and is_spread_narrow  // Vol cao, nến đỏ nhưng spread hẹp
+
+// Nỗ lực nhỏ, kết quả lớn -> Dấu hiệu tốt (dễ đi)
+easy_move_up = is_vol_dry and is_bullish and is_spread_wide  // Vol thấp mà giá tăng mạnh = Cạn cung
+easy_move_down = is_vol_dry and is_bearish and is_spread_wide  // Vol thấp mà giá giảm mạnh = Cạn cầu
+
+// --- STOPPING ACTION (Hành động dừng) ---
+// Nến xanh với spread rộng, volume cao, đóng cửa gần đỉnh -> Demand coming in
+stopping_volume_down = is_bearish and is_vol_climax and close_position > 0.6  // Nến đỏ nhưng đóng gần đỉnh = Buying pressure
+
+// --- SHAKEOUT (Rũ bỏ) ---
+// Giá phá đáy cũ nhưng volume thấp và đóng cửa gần đỉnh nến
+lowest_10 = ta.lowest(low, 10)
+is_shakeout = low < lowest_10[1] and is_vol_dry and close_position > 0.5 and is_bullish
+
+// --- SPRING (Bật lò xo) ---
+// Giá chọc xuống hỗ trợ (EMA233) rồi đóng trên -> Bullish
+is_spring = low < ema233 and close > ema233 and close > open
+
+// --- UPTHRUST (Đẩy lên giả) ---
+// Giá chọc lên kháng cự rồi đóng dưới -> Bearish
+highest_10 = ta.highest(high, 10)
+is_upthrust = high > highest_10[1] and close < open and close_position < 0.5
+
+// --- HIDDEN DISTRIBUTION (Phân phối ẩn) ---
+// Volume climax + Giá không tăng được + Đóng cửa gần đáy
+hidden_distribution = is_vol_climax and is_bullish and close_position < 0.4
+
+// --- ACCUMULATION SIGN (Dấu hiệu tích lũy) ---
+// Volume climax + Nến đỏ nhưng đóng cửa gần đỉnh (có mua vào)
+accumulation_sign = is_vol_climax and is_bearish and close_position > 0.6
+
+// ==========================================
+// 4. CANDLE COLORING BY VOLUME (Tô màu nến theo Volume)
+// ==========================================
+// Vàng (Gold) = Tiền mạnh vào (Vol cao + Bullish + Close gần đỉnh)
+// Xanh đậm (Teal) = Tiền mạnh (Vol > TB + Bullish)
+// Xám = Tiền yếu (Vol thấp)
+// Xanh ngọc nhạt = Volume cạn (Dry)
+
+candle_color = is_vol_climax and is_bullish and close_position > 0.6 ? color.yellow :
+               is_vol_climax and is_bearish and close_position > 0.6 ? color.aqua :  // Absorption
+               is_vol_high and is_bullish ? color.teal :
+               is_vol_high and is_bearish ? color.maroon :
+               is_vol_dry ? color.gray :
+               is_bullish ? color.green : color.red
+
+// Apply to candles
+barcolor(candle_color)
+
+// ==========================================
+// 5. AUTO-SCALING
 // ==========================================
 var float scaler = 0.0
 stdev_cmf = ta.stdev(mf, 50)
 stdev_ck = ta.stdev(ck_raw, 50)
-
-// Tính tỷ lệ phóng to để vẽ Chaikin đè lên CMF
 if stdev_cmf != 0 and stdev_ck != 0
     scaler := stdev_ck / stdev_cmf
-
-// Đường Chaikin đã được thu nhỏ
 ck_visual = ck_raw / (scaler != 0 ? scaler : 1)
 
 // ==========================================
-// 4. HIỂN THỊ (VISUALIZATION)
+// 6. HIỂN THỊ HISTOGRAM
 // ==========================================
-hline(0, "Zero Line", color.gray, hline.style_dotted)
+hline(0, "Zero", color.gray, hline.style_dotted)
+plot(mf, "CMF", style=plot.style_columns, color=mf > 0 ? color.new(color.teal, 40) : color.new(color.red, 40), linewidth=3)
+plot(ck_visual, "Chaikin", color=color.orange, linewidth=2)
 
-// CMF (Cột nền)
-plot(mf, title="CMF Trend", style=plot.style_columns, 
-     color=mf > 0 ? color.new(color.teal, 40) : color.new(color.red, 40), linewidth=3)
-
-// Chaikin Osc (Đường tín hiệu)
-plot(ck_visual, title="Chaikin Signal", color=color.orange, linewidth=2)
+// EMAs (Overlay)
+plot(ema50, "EMA 50", color=above_ema50 ? color.lime : color.red, linewidth=2, force_overlay=true)
+plot(ema144, "EMA 144", color=above_ema144 ? color.lime : color.red, linewidth=3, force_overlay=true)
+plot(ema233, "EMA 233", color=above_ema233 ? color.lime : color.red, linewidth=4, force_overlay=true)
 
 // ==========================================
-// 5. TÍN HIỆU (SMART SLOPE: CHỈ MUA KHI CMF NGÓC ĐẦU LÊN)
+// 7. VSA WARNING ICONS
+// ==========================================
+// 🚦 Volume Climax (có thể là đỉnh/đáy)
+plotshape(is_vol_climax, "Vol Climax", shape.circle, location.abovebar, color.new(color.yellow, 0), size=size.tiny, force_overlay=true)
+
+// ⚡ Shakeout / Spring
+plotshape(is_shakeout or is_spring, "Shakeout/Spring", shape.diamond, location.belowbar, color.aqua, text="⚡", size=size.small, force_overlay=true)
+
+// ⚠️ Hidden Distribution
+plotshape(hidden_distribution, "Hidden Dist", shape.triangledown, location.abovebar, color.orange, text="⚠️", size=size.tiny, force_overlay=true)
+
+// ✅ Accumulation Sign
+plotshape(accumulation_sign, "Accumulation", shape.triangleup, location.belowbar, color.lime, text="💰", size=size.tiny, force_overlay=true)
+
+// 🔻 Upthrust
+plotshape(is_upthrust, "Upthrust", shape.xcross, location.abovebar, color.red, size=size.small, force_overlay=true)
+
+// ==========================================
+// 8. TÍN HIỆU MUA/BÁN (VSA Enhanced)
 // ==========================================
 
-// --- 0. TÍNH TOÁN ĐỘ DỐC (SLOPE) ---
-// Đây là chìa khóa giải quyết vấn đề của bạn:
-// mf > mf[1]: CMF đang hướng lên (Tiền vào mạnh hơn hoặc Lực bán yếu đi)
-// mf < mf[1]: CMF đang hướng xuống (Tiền vào yếu đi hoặc Lực bán mạnh hơn)
-is_slope_up   = mf > mf[1]
+// Slope
+is_slope_up = mf > mf[1]
 is_slope_down = mf < mf[1]
+cmf_recovering = mf < 0 and mf > mf[1] and mf[1] > mf[2]
 
-// --- A. TÍN HIỆU MUA AN TOÀN (Trend Following) ---
-// 1. CMF Xanh + Bền + (MỚI) ĐANG HƯỚNG LÊN
-// Nếu CMF xanh mà đang cắm đầu xuống (mf < mf[1]) => Lực mua yếu => Bỏ qua
-cond_cmf_safe = use_filter ? (mf >= min_val and ta.lowest(mf, min_dur) > 0 and is_slope_up) : (mf > 0 and is_slope_up)
+// Crossovers
+ck_cross_up = ta.crossover(ck_raw, 0)
+ck_cross_down = ta.crossunder(ck_raw, 0)
 
-// 2. EOM Thoáng
-cond_eom_safe = eom_raw > 0
+// Cooldown
+var int bars_since_sell = 100
+var int bars_since_buy = 100
+bars_since_sell := bars_since_sell + 1
+bars_since_buy := bars_since_buy + 1
 
-// 3. Kích nổ
-trigger = ta.crossover(ck_raw, 0)
+// === MUA AN TOÀN ===
+// CMF dương + Ít nhất 2 EMA hỗ trợ + Có dấu hiệu tích lũy/spring
+cond_cmf_ok = mf > 0 and is_slope_up
+cond_ema_ok = ema_count_above >= 2
+cond_vsa_ok = accumulation_sign or is_spring or is_shakeout or easy_move_up
+cond_cooldown_buy = bars_since_buy >= buy_cooldown
 
-// 4. Vol đủ
-is_vol_ok = use_vol ? (volume >= ta.sma(volume, 20) * vol_mult) : true
+buy_safe = cond_cmf_ok and cond_ema_ok and ck_cross_up and cond_cooldown_buy
 
-// => Tín hiệu Mua An Toàn (Màu Xanh Lá)
-buy_safe = cond_cmf_safe and cond_eom_safe and trigger and is_vol_ok
+// === MUA MẠNH (Wyckoff Confirm) ===
+super_buy = buy_safe and cond_vsa_ok
 
+if buy_safe or super_buy
+    bars_since_buy := 0
 
-// --- B. TÍN HIỆU MUA SỚM (Reversal) ---
-// Đoạn này giữ nguyên vì logic của nó vốn đã check độ dốc (mf > mf[1])
-is_red_weakening = (mf < 0) and (mf > mf[1]) and (mf[1] > mf[2])
-is_spark = ta.crossover(ck_raw, 0)
-is_vol_early = volume >= ta.sma(volume, 20) * 0.8
+// === MUA SỚM (Spring/Shakeout) ===
+buy_early = (is_spring or is_shakeout or accumulation_sign) and cmf_recovering and cond_cooldown_buy
 
-// => Tín hiệu Mua Sớm
-buy_early = use_early and is_red_weakening and is_spark and is_vol_early
+if buy_early
+    bars_since_buy := 0
 
+// === BÁN ===
+cond_cmf_weak = mf < 0 and is_slope_down
+cond_ema_weak = ema_count_above <= 1
+cond_vsa_sell = hidden_distribution or is_upthrust or effort_no_result_up
+cond_cooldown_sell = bars_since_sell >= sell_cooldown
 
-// --- C. TÍN HIỆU BÁN THÔNG MINH (SMART SELL) ---
-// Sửa lại logic bán theo ý bạn:
-// 1. CMF phải Âm (mf < 0)
-// 2. Chaikin cắt xuống (Trigger)
-// 3. (QUAN TRỌNG) CMF phải đang cắm đầu xuống (is_slope_down)
-// Nếu CMF đang âm mà lại hướng lên (is_slope_up) nghĩa là đang hồi phục => KHÔNG BÁN.
-sell_sig = (mf < 0) and ta.crossunder(ck_raw, 0) and is_slope_down
+sell_sig = ((cond_cmf_weak and ck_cross_down) or cond_vsa_sell) and cond_ema_weak and cond_cooldown_sell
 
-
-// ==========================================
-// HIỂN THỊ
-// ==========================================
-plotshape(buy_safe, title="Múc An Toàn", style=shape.labelup, location=location.bottom, color=color.lime, text="MÚC", textcolor=color.white, size=size.small)
-plotshape(buy_early, title="Múc Sớm", style=shape.triangleup, location=location.bottom, color=color.orange, text="SỚM", textcolor=color.orange, size=size.small)
-
-// Thêm text giải thích cho lệnh bán để bạn yên tâm
-plotshape(sell_sig, title="Sút", style=shape.labeldown, location=location.top, color=color.red, text="SÚT\n(Gãy)", textcolor=color.white, size=size.small)
+if sell_sig
+    bars_since_sell := 0
 
 // ==========================================
-// 6. DASHBOARD TRẠNG THÁI (ĐÃ SỬA LỖI TABLE)
+// 9. HIỂN THỊ TÍN HIỆU
 // ==========================================
-var table panel = table.new(position.top_right, 2, 4, border_width=1)
+plotshape(super_buy and not super_buy[1], "Super Buy", shape.labelup, location.bottom, color.yellow, text="💎", size=size.normal)
+plotshape(buy_safe and not super_buy and not buy_safe[1], "Buy Safe", shape.labelup, location.bottom, color.lime, text="MÚC", size=size.small)
+plotshape(buy_early and not buy_safe and not buy_early[1], "Buy Early", shape.triangleup, location.bottom, color.orange, text="SỚM", size=size.small)
+plotshape(sell_sig and not sell_sig[1], "Sell", shape.labeldown, location.top, color.red, text="BÁN", size=size.small)
+
+// ==========================================
+// 10. DASHBOARD
+// ==========================================
+var table panel = table.new(position.top_right, 2, 7, border_width=1, force_overlay=true)
 if barstate.islast
-    // Header
-    table.cell(panel, 0, 0, "MONEY TRINITY BY VINH", bgcolor=color.black, text_color=color.white)
+    table.cell(panel, 0, 0, "🐋 TRINITY VSA", bgcolor=color.black, text_color=color.white)
+    table.cell(panel, 1, 0, "BY VINH", bgcolor=color.black, text_color=color.yellow)
     
-    // Row 1: CMF
-    // Đã sửa text_align thành text_halign
-    table.cell(panel, 0, 1, "1. CMF (Trend):", bgcolor=color.white, text_halign=text.align_left)
-    table.cell(panel, 1, 1, mf > 0 ? "VÀO ✅" : "RA ❌", bgcolor=mf > 0 ? color.lime : color.red, text_color=color.white)
+    // Dòng tiền
+    table.cell(panel, 0, 1, "Dòng tiền:", bgcolor=color.white, text_halign=text.align_left)
+    cmf_text = mf > 0.1 ? "VÀO MẠNH 🔥" : mf > 0 ? "VÀO NHẸ ✅" : mf > -0.1 ? "RA NHẸ ⚠️" : "RA MẠNH ❌"
+    table.cell(panel, 1, 1, cmf_text, bgcolor=mf > 0 ? color.lime : color.red, text_color=color.white)
     
-    // Row 2: Chaikin
-    table.cell(panel, 0, 2, "2. Chaikin:", bgcolor=color.white, text_halign=text.align_left)
-    table.cell(panel, 1, 2, ck_raw > 0 ? "MẠNH" : "YẾU", text_color=ck_raw > 0 ? color.green : color.red)
+    // Volume State
+    table.cell(panel, 0, 2, "Volume:", bgcolor=color.white, text_halign=text.align_left)
+    vol_text = is_vol_climax ? "CLIMAX 🚦" : is_vol_high ? "CAO 📈" : is_vol_dry ? "CẠN 💤" : "BÌNH THƯỜNG"
+    vol_color = is_vol_climax ? color.yellow : is_vol_high ? color.green : is_vol_dry ? color.gray : color.blue
+    table.cell(panel, 1, 2, vol_text, text_color=vol_color)
     
-    // Row 3: EOM
-    table.cell(panel, 0, 3, "3. EOM:", bgcolor=color.white, text_halign=text.align_left)
-    table.cell(panel, 1, 3, eom_raw > 0 ? "THOÁNG" : "BÍ", text_color=eom_raw > 0 ? color.green : color.orange)
+    // Wyckoff Signal
+    table.cell(panel, 0, 3, "Wyckoff:", bgcolor=color.white, text_halign=text.align_left)
+    wyckoff_text = is_spring ? "SPRING ⚡" : is_shakeout ? "SHAKEOUT ⚡" : accumulation_sign ? "TÍCH LŨY 💰" : hidden_distribution ? "PHÂN PHỐI ⚠️" : is_upthrust ? "UPTHRUST ❌" : "---"
+    wyckoff_color = is_spring or is_shakeout or accumulation_sign ? color.green : hidden_distribution or is_upthrust ? color.red : color.gray
+    table.cell(panel, 1, 3, wyckoff_text, text_color=wyckoff_color)
+    
+    // Lướt sóng
+    table.cell(panel, 0, 4, "Lướt sóng:", bgcolor=color.white, text_halign=text.align_left)
+    table.cell(panel, 1, 4, above_ema50 ? "OK ✅" : "DƯỚI ❌", text_color=above_ema50 ? color.green : color.red)
+    
+    // Trung hạn
+    table.cell(panel, 0, 5, "Trung hạn:", bgcolor=color.white, text_halign=text.align_left)
+    table.cell(panel, 1, 5, above_ema233 ? "UPTREND ✅" : "DOWNTREND ❌", text_color=above_ema233 ? color.green : color.red)
+    
+    // Cản
+    table.cell(panel, 0, 6, "Cản trên:", bgcolor=color.white, text_halign=text.align_left)
+    res_text = resistance_count == 0 ? "KHÔNG 🚀" : str.tostring(resistance_count) + " CẢN"
+    table.cell(panel, 1, 6, res_text, text_color=resistance_count == 0 ? color.green : color.orange)
+
+// ==========================================
+// ALERTS
+// ==========================================
+alertcondition(super_buy, "💎 MUA MẠNH (Wyckoff)", "Wyckoff Confirm + All signals aligned!")
+alertcondition(buy_safe, "✅ MUA AN TOÀN", "Buy signal")
+alertcondition(is_spring or is_shakeout, "⚡ SPRING/SHAKEOUT", "Potential reversal point!")
+alertcondition(hidden_distribution, "⚠️ PHÂN PHỐI ẨN", "Hidden distribution detected!")
+alertcondition(sell_sig, "🔴 BÁN", "Sell signal")
