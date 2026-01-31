@@ -295,11 +295,11 @@ plotshape(sell_sig and not sell_sig[1], "Sell", shape.labeldown, location.top, c
 plotshape(sell_warning and not sell_sig and not sell_warning[1], "Sell Warning", shape.xcross, location.top, color.fuchsia, size=size.tiny)
 
 // ==========================================
-// 10. DASHBOARD
+// 10. DASHBOARD (ĐƠN GIẢN)
 // ==========================================
-var table panel = table.new(position.top_right, 2, 8, border_width=1, force_overlay=true)
+var table panel = table.new(position.top_right, 2, 6, border_width=1, force_overlay=true)
 if barstate.islast
-    table.cell(panel, 0, 0, "🐋 TRINITY VSA", bgcolor=color.black, text_color=color.white)
+    table.cell(panel, 0, 0, "� TRINITY", bgcolor=color.black, text_color=color.white)
     table.cell(panel, 1, 0, "BY VINH", bgcolor=color.black, text_color=color.yellow)
     
     // Dòng tiền
@@ -307,37 +307,25 @@ if barstate.islast
     cmf_text = mf > 0.1 ? "VÀO MẠNH 🔥" : mf > 0 ? "VÀO NHẸ ✅" : mf > -0.1 ? "RA NHẸ ⚠️" : "RA MẠNH ❌"
     table.cell(panel, 1, 1, cmf_text, bgcolor=mf > 0 ? color.lime : color.red, text_color=color.white)
     
-    // Volume
-    table.cell(panel, 0, 2, "Volume:", bgcolor=color.white, text_halign=text.align_left)
-    vol_text = is_vol_climax ? "CLIMAX ⚡" : is_vol_high ? "CAO 📈" : is_vol_dry ? "CẠN 💤" : "BT"
-    vol_color = is_vol_climax ? color.yellow : is_vol_high ? color.green : is_vol_dry ? color.gray : color.blue
-    table.cell(panel, 1, 2, vol_text, text_color=vol_color)
+    // Trung hạn (EMA233)
+    table.cell(panel, 0, 2, "Trung hạn:", bgcolor=color.white, text_halign=text.align_left)
+    table.cell(panel, 1, 2, above_ema233 ? "UPTREND ✅" : "DOWNTREND ❌", text_color=above_ema233 ? color.green : color.red)
     
-    // RSI
-    table.cell(panel, 0, 3, "RSI:", bgcolor=color.white, text_halign=text.align_left)
-    rsi_text = rsi_overbought ? "QUÁ MUA ⚠️" : rsi_oversold ? "QUÁ BÁN 💡" : str.tostring(rsi_val, "#")
-    rsi_color = rsi_overbought ? color.red : rsi_oversold ? color.green : color.blue
-    table.cell(panel, 1, 3, rsi_text, text_color=rsi_color)
+    // Lướt sóng (EMA50)
+    table.cell(panel, 0, 3, "Lướt sóng:", bgcolor=color.white, text_halign=text.align_left)
+    table.cell(panel, 1, 3, above_ema50 ? "OK ✅" : "DƯỚI ❌", text_color=above_ema50 ? color.green : color.red)
     
-    // RSI Divergence
-    table.cell(panel, 0, 4, "Phân kỳ:", bgcolor=color.white, text_halign=text.align_left)
-    div_text = hidden_bullish ? "ẨN TĂNG 🔵" : regular_bullish ? "THƯỜNG 🟣" : regular_bearish ? "GIẢM 🔴" : "---"
-    div_color = hidden_bullish or regular_bullish ? color.green : regular_bearish ? color.red : color.gray
-    table.cell(panel, 1, 4, div_text, text_color=div_color)
+    // Cản trên
+    table.cell(panel, 0, 4, "Cản trên:", bgcolor=color.white, text_halign=text.align_left)
+    res_text = resistance_count == 0 ? "KHÔNG CÓ �" : resistance_count == 1 ? "1 CẢN ⚠️" : resistance_count == 2 ? "2 CẢN �" : "3 CẢN ❌"
+    res_color = resistance_count == 0 ? color.green : resistance_count <= 1 ? color.orange : color.red
+    table.cell(panel, 1, 4, res_text, text_color=res_color)
     
-    // Wyckoff
-    table.cell(panel, 0, 5, "Wyckoff:", bgcolor=color.white, text_halign=text.align_left)
-    wyckoff_text = is_spring ? "SPRING ⚡" : is_shakeout ? "SHAKE ⚡" : accumulation_sign ? "TÍCH 💰" : hidden_distribution ? "PHÂN ⚠️" : "---"
-    wyckoff_color = is_spring or is_shakeout or accumulation_sign ? color.green : hidden_distribution ? color.red : color.gray
-    table.cell(panel, 1, 5, wyckoff_text, text_color=wyckoff_color)
-    
-    // Lướt sóng
-    table.cell(panel, 0, 6, "Lướt sóng:", bgcolor=color.white, text_halign=text.align_left)
-    table.cell(panel, 1, 6, above_ema50 ? "OK ✅" : "DƯỚI ❌", text_color=above_ema50 ? color.green : color.red)
-    
-    // Trung hạn
-    table.cell(panel, 0, 7, "Trung hạn:", bgcolor=color.white, text_halign=text.align_left)
-    table.cell(panel, 1, 7, above_ema233 ? "UP ✅" : "DOWN ❌", text_color=above_ema233 ? color.green : color.red)
+    // Gợi ý (Recommendation)
+    table.cell(panel, 0, 5, "GỢI Ý:", bgcolor=color.gray, text_halign=text.align_left, text_color=color.white)
+    rec_text = ema_count_above == 3 and mf > 0 ? "MUA MẠNH 💪" : ema_count_above >= 2 and mf > 0 ? "MUA 👍" : rsi_overbought ? "CẨN THẬN ⚠️" : mf < 0 and ema_count_above <= 1 ? "BÁN 👋" : "QUAN SÁT 👀"
+    rec_bg = ema_count_above == 3 and mf > 0 ? color.lime : ema_count_above >= 2 and mf > 0 ? color.green : rsi_overbought ? color.orange : mf < 0 and ema_count_above <= 1 ? color.red : color.gray
+    table.cell(panel, 1, 5, rec_text, bgcolor=rec_bg, text_color=color.white)
 
 // ==========================================
 // ALERTS
