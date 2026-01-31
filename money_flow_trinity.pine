@@ -34,6 +34,12 @@ grp_cooldown = "6. Chống Nhiễu"
 sell_cooldown = input.int(3, "Cooldown BÁN", minval=1, group=grp_cooldown)
 buy_cooldown = input.int(3, "Cooldown MUA", minval=1, group=grp_cooldown)
 
+grp_addon = "7. Cảnh Báo Đặc Biệt"
+i_vSpikeLb = input.bool(true, "Hiện 🚦 (Vol Kiệt sức)", group=grp_addon)
+i_vSpikeTh = input.float(4.669, "Ngưỡng Vol Kiệt sức (x TB)", group=grp_addon, tooltip="Volume > X lần TB = Kiệt sức")
+i_hATRLb = input.bool(true, "Hiện ⚡ (Biến động lỏng lẻo)", group=grp_addon)
+i_atr_mult = input.float(2.718, "Ngưỡng Biến động (x ATR)", group=grp_addon, tooltip="Spread > X lần ATR = Biến động mạnh")
+
 // ==========================================
 // 2. TÍNH TOÁN CORE
 // ==========================================
@@ -81,6 +87,9 @@ is_vol_high = vol_ratio >= 1.5 and vol_ratio < vol_climax_mult
 is_vol_normal = vol_ratio >= 0.8 and vol_ratio < 1.5
 is_vol_dry = vol_ratio < vol_dry_mult
 
+// --- Volume Kiệt sức (Exhaustion) ---
+is_vol_exhaustion = vol_ratio >= i_vSpikeTh  // 🚦 Volume cực đại
+
 // --- Spread Analysis ---
 atr_val = ta.atr(14)
 spread = high - low
@@ -93,8 +102,9 @@ is_bearish = close < open
 close_position = (close - low) / (high - low)
 
 // --- VOLATILITY SURGE (Biến động mạnh) ---
-// Volume đột biến HOẶC Spread rất rộng
-is_volatility_surge = is_vol_climax or (spread > atr_val * 2)
+// Biến động lỏng lẻo theo ATR
+is_high_volatility = spread > atr_val * i_atr_mult  // ⚡ Biến động mạnh
+is_volatility_surge = is_vol_exhaustion or is_high_volatility
 
 // --- VSA Patterns ---
 hidden_distribution = is_vol_climax and is_bullish and close_position < 0.4
@@ -210,8 +220,11 @@ plot(ema233, "EMA 233", color=above_ema233 ? color.lime : color.red, linewidth=4
 // 7. WARNING ICONS
 // ==========================================
 
-// ⚡ VOLATILITY SURGE - Lightning bolt for high volume/volatility
-plotshape(is_volatility_surge, "⚡ Volatility", shape.diamond, location.abovebar, color.new(color.yellow, 0), text="⚡", size=size.small, force_overlay=true)
+// 🚦 VOLUME KIỆT SỨC (Exhaustion) - Chỉ khi bật và Vol > ngưỡng
+plotshape(i_vSpikeLb and is_vol_exhaustion, "🚦 Vol Kiệt sức", shape.circle, location.abovebar, color.new(color.red, 0), text="🚦", size=size.small, force_overlay=true)
+
+// ⚡ BIẾN ĐỘNG LỎNG LẺO (High ATR) - Chỉ khi bật và Spread > ngưỡng ATR
+plotshape(i_hATRLb and is_high_volatility, "⚡ Biến động", shape.diamond, location.abovebar, color.new(color.yellow, 0), text="⚡", size=size.small, force_overlay=true)
 
 // VSA Icons
 plotshape(is_shakeout or is_spring, "Spring/Shakeout", shape.diamond, location.belowbar, color.aqua, size=size.small, force_overlay=true)

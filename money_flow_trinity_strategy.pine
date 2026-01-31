@@ -28,6 +28,12 @@ tp1_pct = input.float(15.0, "Take Profit 1 % (Chốt 50%)", group=grp_risk)
 use_trailing = input.bool(true, "Dùng Trailing Stop?", group=grp_risk)
 trail_pct = input.float(5.0, "Trailing Stop %", group=grp_risk)
 
+grp_addon = "6. Cảnh Báo Đặc Biệt"
+i_vSpikeLb = input.bool(true, "Hiện 🚦 (Vol Kiệt sức)", group=grp_addon)
+i_vSpikeTh = input.float(4.669, "Ngưỡng Vol Kiệt sức (x TB)", group=grp_addon)
+i_hATRLb = input.bool(true, "Hiện ⚡ (Biến động lỏng lẻo)", group=grp_addon)
+i_atr_mult = input.float(2.718, "Ngưỡng Biến động (x ATR)", group=grp_addon)
+
 // ==========================================
 // CALCULATIONS
 // ==========================================
@@ -74,8 +80,10 @@ is_bullish = close > open
 is_bearish = close < open
 close_position = (close - low) / (high - low)
 
-// Volatility Surge
-is_volatility_surge = is_vol_climax or (spread > atr_val * 2)
+// Volume Kiệt sức & Biến động lỏng lẻo
+is_vol_exhaustion = vol_ratio >= i_vSpikeTh  // 🚦
+is_high_volatility = spread > atr_val * i_atr_mult  // ⚡
+is_volatility_surge = is_vol_exhaustion or is_high_volatility
 
 // VSA Patterns
 is_spring = low < ema233 and close > ema233 and close > open
@@ -204,8 +212,9 @@ plot(ema50, "EMA 50", color=above_ema50 ? color.lime : color.red, linewidth=2)
 plot(ema144, "EMA 144", color=above_ema144 ? color.lime : color.red, linewidth=3)
 plot(ema233, "EMA 233", color=above_ema233 ? color.lime : color.red, linewidth=4)
 
-// VSA Icons
-plotshape(is_volatility_surge, "⚡ Volatility", shape.diamond, location.abovebar, color.yellow, text="⚡", size=size.small)
+// VSA Icons - 🚦 và ⚡
+plotshape(i_vSpikeLb and is_vol_exhaustion, "🚦 Vol Kiệt sức", shape.circle, location.abovebar, color.red, text="🚦", size=size.small)
+plotshape(i_hATRLb and is_high_volatility, "⚡ Biến động", shape.diamond, location.abovebar, color.yellow, text="⚡", size=size.small)
 plotshape(is_spring or is_shakeout, "Spring", shape.diamond, location.belowbar, color.aqua, size=size.small)
 plotshape(accumulation_sign, "Accum", shape.triangleup, location.belowbar, color.lime, size=size.tiny)
 plotshape(hidden_distribution, "Dist", shape.triangledown, location.abovebar, color.orange, size=size.tiny)
