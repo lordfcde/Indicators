@@ -1,0 +1,158 @@
+//@version=5
+// Coder Stock - Money Flow Trinity (Ultimate Fix)
+// Đã sửa lỗi: ta.eom (tính thủ công) và table.cell (text_halign)
+indicator(title="Coder Stock - Money Flow Trinity Fixed", shorttitle="CS_Money_Trinity", format=format.price, precision=2)
+
+// ==========================================
+// 1. CẤU HÌNH THÔNG SỐ
+// ==========================================
+
+grp_cmf = "1. CMF (QUAN TRỌNG NHẤT - HẠNG 1)"
+cmf_len = input.int(20, "Độ dài CMF", group=grp_cmf)
+
+grp_ck = "2. Chaikin Osc (HẠNG 2)"
+ck_fast = input.int(3, "Fast Length", group=grp_ck)
+ck_slow = input.int(10, "Slow Length", group=grp_ck)
+
+grp_eom = "3. EOM (HẠNG 3)"
+eom_len = input.int(14, "EOM Length", group=grp_eom)
+eom_div = input.int(10000, "Divisor (Hệ số chia)", group=grp_eom, tooltip="Hệ số chia Volume để tính EOM. Giữ nguyên 10000.")
+
+// --- CẤU HÌNH LỌC NHIỄU (Anti-Noise) ---
+use_filter = input.bool(true, "Bật lọc nhiễu CMF?", group="4. Bộ Lọc Tín Hiệu")
+min_val    = input.float(0.05, "Ngưỡng CMF an toàn", step=0.01, group="4. Bộ Lọc Tín Hiệu")
+min_dur    = input.int(3, "Số phiên Xanh liên tiếp", minval=1, group="4. Bộ Lọc Tín Hiệu")
+
+// --- CẤU HÌNH VOLUME (Chống giả) ---
+use_vol    = input.bool(true, "Lọc Volume?", group="5. Bộ Lọc Khối Lượng")
+vol_mult   = input.float(1.0, "Hệ số Vol (x Trung bình)", step=0.1, group="5. Bộ Lọc Khối Lượng")
+
+// --- CẤU HÌNH MUA SỚM (Bắt đáy) ---
+use_early  = input.bool(true, "Hiện điểm Mua Sớm?", group="6. Cấu Hình Mua Sớm")
+
+// ==========================================
+// 2. TÍNH TOÁN (CORE LOGIC)
+// ==========================================
+
+// --- A. CMF (CHAIKIN MONEY FLOW) ---
+ad_val = close==high and close==low or high==low ? 0 : ((2*close-low-high)/(high-low))*volume
+mf = math.sum(ad_val, cmf_len) / math.sum(volume, cmf_len)
+
+// --- B. CHAIKIN OSCILLATOR ---
+// Công thức: EMA3 - EMA10 của đường A/D
+ad_line = ta.accdist
+ck_raw = ta.ema(ad_line, ck_fast) - ta.ema(ad_line, ck_slow)
+
+// --- C. EOM (EASE OF MOVEMENT - TÍNH THỦ CÔNG) ---
+// 1. Tính khoảng cách di chuyển (Distance Moved)
+dm = ((high + low) / 2) - ((high[1] + low[1]) / 2)
+// 2. Tính tỷ lệ hộp (Box Ratio) - Có xử lý chia cho 0
+br = (volume / eom_div) / ((high - low) != 0 ? (high - low) : 1)
+// 3. Tính EOM thô
+eom_inst = br != 0 ? dm / br : 0
+// 4. Làm mượt EOM (SMA)
+eom_raw = ta.sma(eom_inst, eom_len)
+
+// ==========================================
+// 3. AUTO-SCALING (PHÉP THUẬT PHÓNG TO)
+// ==========================================
+var float scaler = 0.0
+stdev_cmf = ta.stdev(mf, 50)
+stdev_ck = ta.stdev(ck_raw, 50)
+
+// Tính tỷ lệ phóng to để vẽ Chaikin đè lên CMF
+if stdev_cmf != 0 and stdev_ck != 0
+    scaler := stdev_ck / stdev_cmf
+
+// Đường Chaikin đã được thu nhỏ
+ck_visual = ck_raw / (scaler != 0 ? scaler : 1)
+
+// ==========================================
+// 4. HIỂN THỊ (VISUALIZATION)
+// ==========================================
+hline(0, "Zero Line", color.gray, hline.style_dotted)
+
+// CMF (Cột nền)
+plot(mf, title="CMF Trend", style=plot.style_columns, 
+     color=mf > 0 ? color.new(color.teal, 40) : color.new(color.red, 40), linewidth=3)
+
+// Chaikin Osc (Đường tín hiệu)
+plot(ck_visual, title="Chaikin Signal", color=color.orange, linewidth=2)
+
+// ==========================================
+// 5. TÍN HIỆU (SMART SLOPE: CHỈ MUA KHI CMF NGÓC ĐẦU LÊN)
+// ==========================================
+
+// --- 0. TÍNH TOÁN ĐỘ DỐC (SLOPE) ---
+// Đây là chìa khóa giải quyết vấn đề của bạn:
+// mf > mf[1]: CMF đang hướng lên (Tiền vào mạnh hơn hoặc Lực bán yếu đi)
+// mf < mf[1]: CMF đang hướng xuống (Tiền vào yếu đi hoặc Lực bán mạnh hơn)
+is_slope_up   = mf > mf[1]
+is_slope_down = mf < mf[1]
+
+// --- A. TÍN HIỆU MUA AN TOÀN (Trend Following) ---
+// 1. CMF Xanh + Bền + (MỚI) ĐANG HƯỚNG LÊN
+// Nếu CMF xanh mà đang cắm đầu xuống (mf < mf[1]) => Lực mua yếu => Bỏ qua
+cond_cmf_safe = use_filter ? (mf >= min_val and ta.lowest(mf, min_dur) > 0 and is_slope_up) : (mf > 0 and is_slope_up)
+
+// 2. EOM Thoáng
+cond_eom_safe = eom_raw > 0
+
+// 3. Kích nổ
+trigger = ta.crossover(ck_raw, 0)
+
+// 4. Vol đủ
+is_vol_ok = use_vol ? (volume >= ta.sma(volume, 20) * vol_mult) : true
+
+// => Tín hiệu Mua An Toàn (Màu Xanh Lá)
+buy_safe = cond_cmf_safe and cond_eom_safe and trigger and is_vol_ok
+
+
+// --- B. TÍN HIỆU MUA SỚM (Reversal) ---
+// Đoạn này giữ nguyên vì logic của nó vốn đã check độ dốc (mf > mf[1])
+is_red_weakening = (mf < 0) and (mf > mf[1]) and (mf[1] > mf[2])
+is_spark = ta.crossover(ck_raw, 0)
+is_vol_early = volume >= ta.sma(volume, 20) * 0.8
+
+// => Tín hiệu Mua Sớm
+buy_early = use_early and is_red_weakening and is_spark and is_vol_early
+
+
+// --- C. TÍN HIỆU BÁN THÔNG MINH (SMART SELL) ---
+// Sửa lại logic bán theo ý bạn:
+// 1. CMF phải Âm (mf < 0)
+// 2. Chaikin cắt xuống (Trigger)
+// 3. (QUAN TRỌNG) CMF phải đang cắm đầu xuống (is_slope_down)
+// Nếu CMF đang âm mà lại hướng lên (is_slope_up) nghĩa là đang hồi phục => KHÔNG BÁN.
+sell_sig = (mf < 0) and ta.crossunder(ck_raw, 0) and is_slope_down
+
+
+// ==========================================
+// HIỂN THỊ
+// ==========================================
+plotshape(buy_safe, title="Múc An Toàn", style=shape.labelup, location=location.bottom, color=color.lime, text="MÚC", textcolor=color.white, size=size.small)
+plotshape(buy_early, title="Múc Sớm", style=shape.triangleup, location=location.bottom, color=color.orange, text="SỚM", textcolor=color.orange, size=size.small)
+
+// Thêm text giải thích cho lệnh bán để bạn yên tâm
+plotshape(sell_sig, title="Sút", style=shape.labeldown, location=location.top, color=color.red, text="SÚT\n(Gãy)", textcolor=color.white, size=size.small)
+
+// ==========================================
+// 6. DASHBOARD TRẠNG THÁI (ĐÃ SỬA LỖI TABLE)
+// ==========================================
+var table panel = table.new(position.top_right, 2, 4, border_width=1)
+if barstate.islast
+    // Header
+    table.cell(panel, 0, 0, "MONEY TRINITY BY VINH", bgcolor=color.black, text_color=color.white)
+    
+    // Row 1: CMF
+    // Đã sửa text_align thành text_halign
+    table.cell(panel, 0, 1, "1. CMF (Trend):", bgcolor=color.white, text_halign=text.align_left)
+    table.cell(panel, 1, 1, mf > 0 ? "VÀO ✅" : "RA ❌", bgcolor=mf > 0 ? color.lime : color.red, text_color=color.white)
+    
+    // Row 2: Chaikin
+    table.cell(panel, 0, 2, "2. Chaikin:", bgcolor=color.white, text_halign=text.align_left)
+    table.cell(panel, 1, 2, ck_raw > 0 ? "MẠNH" : "YẾU", text_color=ck_raw > 0 ? color.green : color.red)
+    
+    // Row 3: EOM
+    table.cell(panel, 0, 3, "3. EOM:", bgcolor=color.white, text_halign=text.align_left)
+    table.cell(panel, 1, 3, eom_raw > 0 ? "THOÁNG" : "BÍ", text_color=eom_raw > 0 ? color.green : color.orange)
