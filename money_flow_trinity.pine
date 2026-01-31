@@ -1,9 +1,9 @@
 //@version=5
-// Coder Stock - Money Flow Trinity Master (Wyckoff VSA Edition)
-// Tích hợp: CMF + Chaikin + EOM + Wyckoff VSA Analysis
-// Features: Candle Coloring, Volume Climax, Shakeout Detection, Effort vs Result
+// Coder Stock - Money Flow Trinity Master (Wyckoff VSA + RSI Divergence)
+// Tích hợp: CMF + Chaikin + EOM + Wyckoff VSA + RSI Divergence
+// Features: Candle Coloring, Volume Climax, Shakeout, RSI Divergence, Volatility Alert
 // Author: Vinh
-indicator(title="CS Trinity Master VSA", shorttitle="CS_Trinity_VSA", format=format.price, precision=2)
+indicator(title="CS Trinity Master VSA", shorttitle="CS_Trinity_VSA", format=format.price, precision=2, max_lines_count=100)
 
 // ==========================================
 // 1. CẤU HÌNH
@@ -20,11 +20,17 @@ eom_len = input.int(14, "Length", group=grp_eom)
 eom_div = input.int(10000, "Divisor", group=grp_eom)
 
 grp_vsa = "4. Wyckoff VSA"
-vol_climax_mult = input.float(2.0, "Volume Climax (x TB)", group=grp_vsa, tooltip="Volume > X lần trung bình = Climax")
-vol_dry_mult = input.float(0.5, "Volume Cạn (x TB)", group=grp_vsa, tooltip="Volume < X lần trung bình = Cạn")
+vol_climax_mult = input.float(2.0, "Volume Climax (x TB)", group=grp_vsa)
+vol_dry_mult = input.float(0.5, "Volume Cạn (x TB)", group=grp_vsa)
 spread_narrow = input.float(0.5, "Spread Hẹp (x ATR)", group=grp_vsa)
 
-grp_cooldown = "5. Chống Nhiễu"
+grp_rsi = "5. RSI Divergence"
+rsi_len = input.int(14, "RSI Length", group=grp_rsi)
+rsi_ob = input.int(70, "Overbought", group=grp_rsi)
+rsi_os = input.int(30, "Oversold", group=grp_rsi)
+pivot_lookback = input.int(5, "Pivot Lookback", group=grp_rsi)
+
+grp_cooldown = "6. Chống Nhiễu"
 sell_cooldown = input.int(3, "Cooldown BÁN", minval=1, group=grp_cooldown)
 buy_cooldown = input.int(3, "Cooldown MUA", minval=1, group=grp_cooldown)
 
@@ -57,6 +63,11 @@ above_ema233 = close > ema233
 ema_count_above = (above_ema50 ? 1 : 0) + (above_ema144 ? 1 : 0) + (above_ema233 ? 1 : 0)
 resistance_count = 3 - ema_count_above
 
+// --- RSI ---
+rsi_val = ta.rsi(close, rsi_len)
+rsi_overbought = rsi_val > rsi_ob
+rsi_oversold = rsi_val < rsi_os
+
 // ==========================================
 // 3. WYCKOFF VSA ANALYSIS
 // ==========================================
@@ -65,82 +76,119 @@ resistance_count = 3 - ema_count_above
 vol_sma = ta.sma(volume, 20)
 vol_ratio = volume / vol_sma
 
-// Volume States
-is_vol_climax = vol_ratio >= vol_climax_mult     // 🚦 Volume Kiệt sức/Climax
-is_vol_high = vol_ratio >= 1.5 and vol_ratio < vol_climax_mult  // High Vol
+is_vol_climax = vol_ratio >= vol_climax_mult
+is_vol_high = vol_ratio >= 1.5 and vol_ratio < vol_climax_mult
 is_vol_normal = vol_ratio >= 0.8 and vol_ratio < 1.5
-is_vol_dry = vol_ratio < vol_dry_mult            // Cạn Volume
+is_vol_dry = vol_ratio < vol_dry_mult
 
-// --- Spread Analysis (Độ rộng nến) ---
+// --- Spread Analysis ---
 atr_val = ta.atr(14)
 spread = high - low
 is_spread_wide = spread > atr_val * 1.5
 is_spread_narrow = spread < atr_val * spread_narrow
-is_spread_normal = not is_spread_wide and not is_spread_narrow
 
 // --- Candle Character ---
 is_bullish = close > open
 is_bearish = close < open
-close_position = (close - low) / (high - low)  // 0 = close ở đáy, 1 = close ở đỉnh
+close_position = (close - low) / (high - low)
 
-// --- EFFORT vs RESULT (Nỗ lực vs Kết quả) ---
-// High Effort = Volume cao
-// Result = Spread (độ rộng nến)
+// --- VOLATILITY SURGE (Biến động mạnh) ---
+// Volume đột biến HOẶC Spread rất rộng
+is_volatility_surge = is_vol_climax or (spread > atr_val * 2)
 
-// Nỗ lực lớn, kết quả nhỏ -> Cảnh báo (có thể phân phối ẩn hoặc tích lũy)
-effort_no_result_up = is_vol_climax and is_bullish and is_spread_narrow  // Vol cao, nến xanh nhưng spread hẹp
-effort_no_result_down = is_vol_climax and is_bearish and is_spread_narrow  // Vol cao, nến đỏ nhưng spread hẹp
-
-// Nỗ lực nhỏ, kết quả lớn -> Dấu hiệu tốt (dễ đi)
-easy_move_up = is_vol_dry and is_bullish and is_spread_wide  // Vol thấp mà giá tăng mạnh = Cạn cung
-easy_move_down = is_vol_dry and is_bearish and is_spread_wide  // Vol thấp mà giá giảm mạnh = Cạn cầu
-
-// --- STOPPING ACTION (Hành động dừng) ---
-// Nến xanh với spread rộng, volume cao, đóng cửa gần đỉnh -> Demand coming in
-stopping_volume_down = is_bearish and is_vol_climax and close_position > 0.6  // Nến đỏ nhưng đóng gần đỉnh = Buying pressure
-
-// --- SHAKEOUT (Rũ bỏ) ---
-// Giá phá đáy cũ nhưng volume thấp và đóng cửa gần đỉnh nến
+// --- VSA Patterns ---
+hidden_distribution = is_vol_climax and is_bullish and close_position < 0.4
+accumulation_sign = is_vol_climax and is_bearish and close_position > 0.6
 lowest_10 = ta.lowest(low, 10)
 is_shakeout = low < lowest_10[1] and is_vol_dry and close_position > 0.5 and is_bullish
-
-// --- SPRING (Bật lò xo) ---
-// Giá chọc xuống hỗ trợ (EMA233) rồi đóng trên -> Bullish
 is_spring = low < ema233 and close > ema233 and close > open
-
-// --- UPTHRUST (Đẩy lên giả) ---
-// Giá chọc lên kháng cự rồi đóng dưới -> Bearish
 highest_10 = ta.highest(high, 10)
 is_upthrust = high > highest_10[1] and close < open and close_position < 0.5
-
-// --- HIDDEN DISTRIBUTION (Phân phối ẩn) ---
-// Volume climax + Giá không tăng được + Đóng cửa gần đáy
-hidden_distribution = is_vol_climax and is_bullish and close_position < 0.4
-
-// --- ACCUMULATION SIGN (Dấu hiệu tích lũy) ---
-// Volume climax + Nến đỏ nhưng đóng cửa gần đỉnh (có mua vào)
-accumulation_sign = is_vol_climax and is_bearish and close_position > 0.6
+easy_move_up = is_vol_dry and is_bullish and is_spread_wide
 
 // ==========================================
-// 4. CANDLE COLORING BY VOLUME (Tô màu nến theo Volume)
+// 4. RSI DIVERGENCE DETECTION
 // ==========================================
-// Vàng (Gold) = Tiền mạnh vào (Vol cao + Bullish + Close gần đỉnh)
-// Xanh đậm (Teal) = Tiền mạnh (Vol > TB + Bullish)
-// Xám = Tiền yếu (Vol thấp)
-// Xanh ngọc nhạt = Volume cạn (Dry)
 
-candle_color = is_vol_climax and is_bullish and close_position > 0.6 ? color.yellow :
-               is_vol_climax and is_bearish and close_position > 0.6 ? color.aqua :  // Absorption
+// Pivot detection
+price_pivot_low = ta.pivotlow(low, pivot_lookback, pivot_lookback)
+price_pivot_high = ta.pivothigh(high, pivot_lookback, pivot_lookback)
+rsi_pivot_low = ta.pivotlow(rsi_val, pivot_lookback, pivot_lookback)
+rsi_pivot_high = ta.pivothigh(rsi_val, pivot_lookback, pivot_lookback)
+
+// Store previous pivots
+var float prev_price_low = na
+var float prev_rsi_low = na
+var int prev_low_bar = na
+var float prev_price_high = na
+var float prev_rsi_high = na
+var int prev_high_bar = na
+
+// Current pivots (shifted by lookback)
+curr_price_low = price_pivot_low
+curr_rsi_low = rsi_pivot_low
+curr_price_high = price_pivot_high
+curr_rsi_high = rsi_pivot_high
+
+// === HIDDEN BULLISH DIVERGENCE ===
+// Price: Higher Low (HL) + RSI: Lower Low (LL) -> MUA LƯỚT
+hidden_bullish = false
+if not na(curr_price_low) and not na(prev_price_low)
+    price_hl = low[pivot_lookback] > prev_price_low  // Price Higher Low
+    rsi_ll = rsi_val[pivot_lookback] < prev_rsi_low  // RSI Lower Low
+    in_oversold_zone = rsi_val[pivot_lookback] < 50  // RSI trong vùng thấp
+    if price_hl and rsi_ll and in_oversold_zone
+        hidden_bullish := true
+
+// === REGULAR BULLISH DIVERGENCE ===
+// Price: Lower Low (LL) + RSI: Higher Low (HL) -> BẮT ĐÁY
+regular_bullish = false
+if not na(curr_price_low) and not na(prev_price_low)
+    price_ll = low[pivot_lookback] < prev_price_low  // Price Lower Low
+    rsi_hl = rsi_val[pivot_lookback] > prev_rsi_low  // RSI Higher Low
+    in_oversold = rsi_val[pivot_lookback] < 40  // RSI quá bán
+    if price_ll and rsi_hl and in_oversold
+        regular_bullish := true
+
+// === BEARISH DIVERGENCE ===
+// Price: Higher High + RSI: Lower High -> CẢNH BÁO BÁN
+regular_bearish = false
+if not na(curr_price_high) and not na(prev_price_high)
+    price_hh = high[pivot_lookback] > prev_price_high
+    rsi_lh = rsi_val[pivot_lookback] < prev_rsi_high
+    in_overbought = rsi_val[pivot_lookback] > 60
+    if price_hh and rsi_lh and in_overbought
+        regular_bearish := true
+
+// Update previous pivots
+if not na(curr_price_low)
+    prev_price_low := low[pivot_lookback]
+    prev_rsi_low := rsi_val[pivot_lookback]
+    prev_low_bar := bar_index - pivot_lookback
+
+if not na(curr_price_high)
+    prev_price_high := high[pivot_lookback]
+    prev_rsi_high := rsi_val[pivot_lookback]
+    prev_high_bar := bar_index - pivot_lookback
+
+// ==========================================
+// 5. CANDLE COLORING
+// ==========================================
+
+// Nến VOLATILITY SURGE = Viền đậm (dùng màu đặc biệt)
+candle_color = is_volatility_surge and is_bullish ? color.new(color.yellow, 0) :  // Vàng đậm - Tiền mạnh
+               is_volatility_surge and is_bearish ? color.new(color.fuchsia, 0) :  // Tím đậm - Biến động mạnh
+               is_vol_climax and is_bullish and close_position > 0.6 ? color.yellow :
+               is_vol_climax and is_bearish and close_position > 0.6 ? color.aqua :
                is_vol_high and is_bullish ? color.teal :
                is_vol_high and is_bearish ? color.maroon :
                is_vol_dry ? color.gray :
                is_bullish ? color.green : color.red
 
-// Apply to candles
 barcolor(candle_color)
 
 // ==========================================
-// 5. AUTO-SCALING
+// 6. AUTO-SCALING & VISUALIZATION
 // ==========================================
 var float scaler = 0.0
 stdev_cmf = ta.stdev(mf, 50)
@@ -149,9 +197,6 @@ if stdev_cmf != 0 and stdev_ck != 0
     scaler := stdev_ck / stdev_cmf
 ck_visual = ck_raw / (scaler != 0 ? scaler : 1)
 
-// ==========================================
-// 6. HIỂN THỊ HISTOGRAM
-// ==========================================
 hline(0, "Zero", color.gray, hline.style_dotted)
 plot(mf, "CMF", style=plot.style_columns, color=mf > 0 ? color.new(color.teal, 40) : color.new(color.red, 40), linewidth=3)
 plot(ck_visual, "Chaikin", color=color.orange, linewidth=2)
@@ -162,73 +207,70 @@ plot(ema144, "EMA 144", color=above_ema144 ? color.lime : color.red, linewidth=3
 plot(ema233, "EMA 233", color=above_ema233 ? color.lime : color.red, linewidth=4, force_overlay=true)
 
 // ==========================================
-// 7. VSA WARNING ICONS
+// 7. WARNING ICONS
 // ==========================================
-// 🚦 Volume Climax (có thể là đỉnh/đáy)
-plotshape(is_vol_climax, "Vol Climax", shape.circle, location.abovebar, color.new(color.yellow, 0), size=size.tiny, force_overlay=true)
 
-// ⚡ Shakeout / Spring
-plotshape(is_shakeout or is_spring, "Shakeout/Spring", shape.diamond, location.belowbar, color.aqua, text="⚡", size=size.small, force_overlay=true)
+// ⚡ VOLATILITY SURGE - Lightning bolt for high volume/volatility
+plotshape(is_volatility_surge, "⚡ Volatility", shape.diamond, location.abovebar, color.new(color.yellow, 0), text="⚡", size=size.small, force_overlay=true)
 
-// ⚠️ Hidden Distribution
-plotshape(hidden_distribution, "Hidden Dist", shape.triangledown, location.abovebar, color.orange, text="⚠️", size=size.tiny, force_overlay=true)
-
-// ✅ Accumulation Sign
+// VSA Icons
+plotshape(is_shakeout or is_spring, "Spring/Shakeout", shape.diamond, location.belowbar, color.aqua, size=size.small, force_overlay=true)
 plotshape(accumulation_sign, "Accumulation", shape.triangleup, location.belowbar, color.lime, text="💰", size=size.tiny, force_overlay=true)
-
-// 🔻 Upthrust
+plotshape(hidden_distribution, "Hidden Dist", shape.triangledown, location.abovebar, color.orange, text="⚠️", size=size.tiny, force_overlay=true)
 plotshape(is_upthrust, "Upthrust", shape.xcross, location.abovebar, color.red, size=size.small, force_overlay=true)
 
+// RSI Divergence Icons
+plotshape(hidden_bullish[pivot_lookback], "Hidden Bullish Div", shape.labelup, location.belowbar, color.blue, text="HD", size=size.small, force_overlay=true)
+plotshape(regular_bullish[pivot_lookback], "Regular Bullish Div", shape.labelup, location.belowbar, color.purple, text="RD", size=size.small, force_overlay=true)
+plotshape(regular_bearish[pivot_lookback], "Bearish Div", shape.labeldown, location.abovebar, color.red, text="BD", size=size.small, force_overlay=true)
+
 // ==========================================
-// 8. TÍN HIỆU MUA/BÁN (VSA Enhanced)
+// 8. TÍN HIỆU MUA/BÁN
 // ==========================================
 
-// Slope
 is_slope_up = mf > mf[1]
-is_slope_down = mf < mf[1]
 cmf_recovering = mf < 0 and mf > mf[1] and mf[1] > mf[2]
-
-// Crossovers
 ck_cross_up = ta.crossover(ck_raw, 0)
 ck_cross_down = ta.crossunder(ck_raw, 0)
 
-// Cooldown
 var int bars_since_sell = 100
 var int bars_since_buy = 100
 bars_since_sell := bars_since_sell + 1
 bars_since_buy := bars_since_buy + 1
 
-// === MUA AN TOÀN ===
-// CMF dương + Ít nhất 2 EMA hỗ trợ + Có dấu hiệu tích lũy/spring
 cond_cmf_ok = mf > 0 and is_slope_up
 cond_ema_ok = ema_count_above >= 2
 cond_vsa_ok = accumulation_sign or is_spring or is_shakeout or easy_move_up
 cond_cooldown_buy = bars_since_buy >= buy_cooldown
 
+// MUA AN TOÀN
 buy_safe = cond_cmf_ok and cond_ema_ok and ck_cross_up and cond_cooldown_buy
 
-// === MUA MẠNH (Wyckoff Confirm) ===
-super_buy = buy_safe and cond_vsa_ok
+// MUA MẠNH (Wyckoff + RSI Confirm)
+super_buy = (buy_safe and cond_vsa_ok) or hidden_bullish[pivot_lookback]
 
 if buy_safe or super_buy
     bars_since_buy := 0
 
-// === MUA SỚM (Spring/Shakeout) ===
-buy_early = (is_spring or is_shakeout or accumulation_sign) and cmf_recovering and cond_cooldown_buy
+// MUA SỚM (RSI Divergence / Spring)
+buy_early = ((is_spring or is_shakeout or accumulation_sign) and cmf_recovering and cond_cooldown_buy) or regular_bullish[pivot_lookback]
 
 if buy_early
     bars_since_buy := 0
 
-// === BÁN ===
-cond_cmf_weak = mf < 0 and is_slope_down
+// BÁN
+cond_cmf_weak = mf < 0 and mf < mf[1]
 cond_ema_weak = ema_count_above <= 1
-cond_vsa_sell = hidden_distribution or is_upthrust or effort_no_result_up
+cond_vsa_sell = hidden_distribution or is_upthrust
 cond_cooldown_sell = bars_since_sell >= sell_cooldown
 
-sell_sig = ((cond_cmf_weak and ck_cross_down) or cond_vsa_sell) and cond_ema_weak and cond_cooldown_sell
+sell_sig = ((cond_cmf_weak and ck_cross_down) or cond_vsa_sell or regular_bearish[pivot_lookback]) and cond_ema_weak and cond_cooldown_sell
 
 if sell_sig
     bars_since_sell := 0
+
+// Cảnh báo bán (RSI overbought + bearish div)
+sell_warning = rsi_overbought and regular_bearish[pivot_lookback]
 
 // ==========================================
 // 9. HIỂN THỊ TÍN HIỆU
@@ -237,11 +279,12 @@ plotshape(super_buy and not super_buy[1], "Super Buy", shape.labelup, location.b
 plotshape(buy_safe and not super_buy and not buy_safe[1], "Buy Safe", shape.labelup, location.bottom, color.lime, text="MÚC", size=size.small)
 plotshape(buy_early and not buy_safe and not buy_early[1], "Buy Early", shape.triangleup, location.bottom, color.orange, text="SỚM", size=size.small)
 plotshape(sell_sig and not sell_sig[1], "Sell", shape.labeldown, location.top, color.red, text="BÁN", size=size.small)
+plotshape(sell_warning and not sell_sig and not sell_warning[1], "Sell Warning", shape.xcross, location.top, color.fuchsia, size=size.tiny)
 
 // ==========================================
 // 10. DASHBOARD
 // ==========================================
-var table panel = table.new(position.top_right, 2, 7, border_width=1, force_overlay=true)
+var table panel = table.new(position.top_right, 2, 8, border_width=1, force_overlay=true)
 if barstate.islast
     table.cell(panel, 0, 0, "🐋 TRINITY VSA", bgcolor=color.black, text_color=color.white)
     table.cell(panel, 1, 0, "BY VINH", bgcolor=color.black, text_color=color.yellow)
@@ -251,36 +294,44 @@ if barstate.islast
     cmf_text = mf > 0.1 ? "VÀO MẠNH 🔥" : mf > 0 ? "VÀO NHẸ ✅" : mf > -0.1 ? "RA NHẸ ⚠️" : "RA MẠNH ❌"
     table.cell(panel, 1, 1, cmf_text, bgcolor=mf > 0 ? color.lime : color.red, text_color=color.white)
     
-    // Volume State
+    // Volume
     table.cell(panel, 0, 2, "Volume:", bgcolor=color.white, text_halign=text.align_left)
-    vol_text = is_vol_climax ? "CLIMAX 🚦" : is_vol_high ? "CAO 📈" : is_vol_dry ? "CẠN 💤" : "BÌNH THƯỜNG"
+    vol_text = is_vol_climax ? "CLIMAX ⚡" : is_vol_high ? "CAO 📈" : is_vol_dry ? "CẠN 💤" : "BT"
     vol_color = is_vol_climax ? color.yellow : is_vol_high ? color.green : is_vol_dry ? color.gray : color.blue
     table.cell(panel, 1, 2, vol_text, text_color=vol_color)
     
-    // Wyckoff Signal
-    table.cell(panel, 0, 3, "Wyckoff:", bgcolor=color.white, text_halign=text.align_left)
-    wyckoff_text = is_spring ? "SPRING ⚡" : is_shakeout ? "SHAKEOUT ⚡" : accumulation_sign ? "TÍCH LŨY 💰" : hidden_distribution ? "PHÂN PHỐI ⚠️" : is_upthrust ? "UPTHRUST ❌" : "---"
-    wyckoff_color = is_spring or is_shakeout or accumulation_sign ? color.green : hidden_distribution or is_upthrust ? color.red : color.gray
-    table.cell(panel, 1, 3, wyckoff_text, text_color=wyckoff_color)
+    // RSI
+    table.cell(panel, 0, 3, "RSI:", bgcolor=color.white, text_halign=text.align_left)
+    rsi_text = rsi_overbought ? "QUÁ MUA ⚠️" : rsi_oversold ? "QUÁ BÁN 💡" : str.tostring(rsi_val, "#")
+    rsi_color = rsi_overbought ? color.red : rsi_oversold ? color.green : color.blue
+    table.cell(panel, 1, 3, rsi_text, text_color=rsi_color)
+    
+    // RSI Divergence
+    table.cell(panel, 0, 4, "Phân kỳ:", bgcolor=color.white, text_halign=text.align_left)
+    div_text = hidden_bullish ? "ẨN TĂNG 🔵" : regular_bullish ? "THƯỜNG 🟣" : regular_bearish ? "GIẢM 🔴" : "---"
+    div_color = hidden_bullish or regular_bullish ? color.green : regular_bearish ? color.red : color.gray
+    table.cell(panel, 1, 4, div_text, text_color=div_color)
+    
+    // Wyckoff
+    table.cell(panel, 0, 5, "Wyckoff:", bgcolor=color.white, text_halign=text.align_left)
+    wyckoff_text = is_spring ? "SPRING ⚡" : is_shakeout ? "SHAKE ⚡" : accumulation_sign ? "TÍCH 💰" : hidden_distribution ? "PHÂN ⚠️" : "---"
+    wyckoff_color = is_spring or is_shakeout or accumulation_sign ? color.green : hidden_distribution ? color.red : color.gray
+    table.cell(panel, 1, 5, wyckoff_text, text_color=wyckoff_color)
     
     // Lướt sóng
-    table.cell(panel, 0, 4, "Lướt sóng:", bgcolor=color.white, text_halign=text.align_left)
-    table.cell(panel, 1, 4, above_ema50 ? "OK ✅" : "DƯỚI ❌", text_color=above_ema50 ? color.green : color.red)
+    table.cell(panel, 0, 6, "Lướt sóng:", bgcolor=color.white, text_halign=text.align_left)
+    table.cell(panel, 1, 6, above_ema50 ? "OK ✅" : "DƯỚI ❌", text_color=above_ema50 ? color.green : color.red)
     
     // Trung hạn
-    table.cell(panel, 0, 5, "Trung hạn:", bgcolor=color.white, text_halign=text.align_left)
-    table.cell(panel, 1, 5, above_ema233 ? "UPTREND ✅" : "DOWNTREND ❌", text_color=above_ema233 ? color.green : color.red)
-    
-    // Cản
-    table.cell(panel, 0, 6, "Cản trên:", bgcolor=color.white, text_halign=text.align_left)
-    res_text = resistance_count == 0 ? "KHÔNG 🚀" : str.tostring(resistance_count) + " CẢN"
-    table.cell(panel, 1, 6, res_text, text_color=resistance_count == 0 ? color.green : color.orange)
+    table.cell(panel, 0, 7, "Trung hạn:", bgcolor=color.white, text_halign=text.align_left)
+    table.cell(panel, 1, 7, above_ema233 ? "UP ✅" : "DOWN ❌", text_color=above_ema233 ? color.green : color.red)
 
 // ==========================================
 // ALERTS
 // ==========================================
-alertcondition(super_buy, "💎 MUA MẠNH (Wyckoff)", "Wyckoff Confirm + All signals aligned!")
-alertcondition(buy_safe, "✅ MUA AN TOÀN", "Buy signal")
-alertcondition(is_spring or is_shakeout, "⚡ SPRING/SHAKEOUT", "Potential reversal point!")
-alertcondition(hidden_distribution, "⚠️ PHÂN PHỐI ẨN", "Hidden distribution detected!")
-alertcondition(sell_sig, "🔴 BÁN", "Sell signal")
+alertcondition(super_buy, "💎 MUA MẠNH", "Super Buy - Wyckoff + RSI Confirm!")
+alertcondition(hidden_bullish, "🔵 HIDDEN BULLISH", "RSI Hidden Bullish Divergence - MUA LƯỚT!")
+alertcondition(regular_bullish, "🟣 REGULAR BULLISH", "RSI Regular Bullish Divergence - BẮT ĐÁY!")
+alertcondition(regular_bearish, "🔴 BEARISH DIV", "RSI Bearish Divergence - CẢNH BÁO!")
+alertcondition(is_volatility_surge, "⚡ VOLATILITY", "Volume/Price Surge Detected!")
+alertcondition(sell_sig, "🔴 BÁN", "Sell Signal!")
