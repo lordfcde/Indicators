@@ -465,7 +465,8 @@ if barstate.islast
     else if rsi_overbought
         rec_text := "CẨN THẬN ⚠️"
         rec_bg := color.orange
-    else if rsi_oversold and above_ema233
+    // CƠ HỘI MUA chỉ khi: RSI oversold + có RSI bullish divergence + dòng tiền không ra mạnh + không downtrend xác nhận
+    else if rsi_oversold and (regular_bullish or hidden_bullish) and mf > -0.1 and not is_confirmed_downtrend
         rec_text := "CƠ HỘI MUA 🎯"
         rec_bg := color.teal
     else
