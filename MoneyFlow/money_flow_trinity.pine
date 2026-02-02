@@ -492,12 +492,12 @@ if barstate.islast
     else if is_choppy_market
         rec_text := "QUAN SÁT 🔄"
         rec_bg := color.gray
-    // ƯU TIÊN 4: Dòng tiền vào mạnh 3+ phiên → MUA HẾT TAY
-    else if is_critical_inflow
+    // ƯU TIÊN 4: Dòng tiền vào mạnh 3+ phiên + UPTREND → MUA MARGIN (An toàn nhất)
+    else if is_critical_inflow and is_confirmed_uptrend
         rec_text := "MUA MARGIN 🚀"
         rec_bg := color.teal
-    // ƯU TIÊN 5: Dòng tiền vào mạnh + uptrend → MUA MẠNH
-    else if is_strong_inflow and is_confirmed_uptrend
+    // ƯU TIÊN 5: Dòng tiền vào mạnh (3+ phiên chưa uptrend HOẶC 1 phiên + uptrend) → MUA MẠNH
+    else if is_critical_inflow or (is_strong_inflow and is_confirmed_uptrend)
         rec_text := "MUA MẠNH 💪"
         rec_bg := color.lime
     // ƯU TIÊN 6: Dòng tiền vào nhẹ + (Lướt sóng OK hoặc Vào nhẹ 2+ phiên) + giá trên EMA233 → MUA 1 PHẦN
