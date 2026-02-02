@@ -136,16 +136,19 @@ ob_phv = ta.pivothigh(volume, ob_length, ob_length)
 // Bearish Order Block coordinates
 var bear_ob_top = array.new_float(0)
 var bear_ob_btm = array.new_float(0)
+var bear_ob_time = array.new_int(0)  // Store creation time
 
 // Detect new Bearish OB (Volume pivot + Downtrend)
 is_bearish_ob = not na(ob_phv) and ob_os == 0
 if is_bearish_ob
     array.unshift(bear_ob_top, high[ob_length])
     array.unshift(bear_ob_btm, hl2[ob_length])
+    array.unshift(bear_ob_time, time[ob_length])  // Store the time of OB candle
     // Keep max 5 OBs
     if array.size(bear_ob_top) > 5
         array.pop(bear_ob_top)
         array.pop(bear_ob_btm)
+        array.pop(bear_ob_time)
 
 // Remove mitigated OBs (price > ob_top)
 target_bear_ob = ta.highest(high, ob_length)
@@ -154,6 +157,7 @@ if array.size(bear_ob_top) > 0
         if i < array.size(bear_ob_top) and target_bear_ob > array.get(bear_ob_top, i)
             array.remove(bear_ob_top, i)
             array.remove(bear_ob_btm, i)
+            array.remove(bear_ob_time, i)
 
 // Count active Bearish OBs above current price (resistance)
 ob_resistance_count = 0
@@ -184,13 +188,11 @@ if barstate.islast and i_showOB and array.size(bear_ob_top) > 0
     for i = 0 to math.min(4, array.size(bear_ob_top) - 1)  // Max 5 OBs
         ob_top_val = array.get(bear_ob_top, i)
         ob_btm_val = array.get(bear_ob_btm, i)
+        ob_time_val = array.get(bear_ob_time, i)  // Get stored OB creation time
         ob_avg_val = math.avg(ob_top_val, ob_btm_val)
         
-        // Draw box on overlay using bar_time
-        left_time = time - 50 * timeframe.in_seconds() * 1000
-        right_time = time + 20 * timeframe.in_seconds() * 1000
-        
-        new_box = box.new(left_time, ob_top_val, right_time, ob_btm_val, 
+        // Draw box starting from OB candle time
+        new_box = box.new(ob_time_val, ob_top_val, time, ob_btm_val, 
               xloc=xloc.bar_time,
               border_color=color.new(#ff1100, 60), 
               bgcolor=color.new(#ff1100, 85),
@@ -199,8 +201,8 @@ if barstate.islast and i_showOB and array.size(bear_ob_top) > 0
               force_overlay=true)
         array.push(ob_boxes, new_box)
         
-        // Draw label on overlay
-        new_label = label.new(right_time, ob_avg_val, "OB", 
+        // Draw label at current bar
+        new_label = label.new(time, ob_avg_val, "OB", 
               xloc=xloc.bar_time,
               style=label.style_label_left,
               color=color.new(#ff1100, 70),
