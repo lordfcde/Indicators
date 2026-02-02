@@ -17,6 +17,7 @@ grp_display = "🎨 Hiển Thị"
 i_volSpikeLb = input.bool(true, "Hiện ⚡ Vol Đột biến", group=grp_display, tooltip="Volume cao gấp 2.5x MA20 + Giá biến động mạnh")
 i_volDryLb = input.bool(true, "Hiện 🚦 Vol Cạn kiệt", group=grp_display, tooltip="Volume thấp + Giá đi ngang = Tích lũy")
 i_candleColoring = input.bool(true, "Tô màu nến theo biến động", group=grp_display, tooltip="Nến đậm = biến động mạnh, nến nhạt = biến động yếu")
+i_showOB = input.bool(true, "Hiện 📦 Order Block", group=grp_display, tooltip="Hiển thị vùng Order Block (cản) trên chart")
 
 // ==========================================
 // CÀI ĐẶT NỘI BỘ (ẨN)
@@ -164,6 +165,42 @@ if array.size(bear_ob_btm) > 0
             ob_resistance_count := ob_resistance_count + 1
 
 has_ob_resistance = ob_resistance_count > 0
+
+// Draw Order Block boxes on chart
+var ob_boxes = array.new_box(0)
+var ob_labels = array.new_label(0)
+
+// Clear old boxes
+if barstate.isfirst or barstate.islast
+    for b in ob_boxes
+        box.delete(b)
+    for l in ob_labels
+        label.delete(l)
+    array.clear(ob_boxes)
+    array.clear(ob_labels)
+
+// Draw new OB boxes
+if barstate.islast and i_showOB and array.size(bear_ob_top) > 0
+    for i = 0 to math.min(4, array.size(bear_ob_top) - 1)  // Max 5 OBs
+        ob_top = array.get(bear_ob_top, i)
+        ob_btm = array.get(bear_ob_btm, i)
+        ob_avg = math.avg(ob_top, ob_btm)
+        
+        // Draw box
+        new_box = box.new(bar_index - 50, ob_top, bar_index + 20, ob_btm, 
+              border_color=color.new(#ff1100, 60), 
+              bgcolor=color.new(#ff1100, 85),
+              border_width=1,
+              extend=extend.right)
+        array.push(ob_boxes, new_box)
+        
+        // Draw label
+        new_label = label.new(bar_index + 25, ob_avg, "OB", 
+              style=label.style_label_left,
+              color=color.new(#ff1100, 70),
+              textcolor=color.white,
+              size=size.small)
+        array.push(ob_labels, new_label)
 
 // ==========================================
 // 4. RSI DIVERGENCE DETECTION
