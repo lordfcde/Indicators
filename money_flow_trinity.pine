@@ -87,9 +87,6 @@ is_vol_high = vol_ratio >= 1.5 and vol_ratio < vol_climax_mult
 is_vol_normal = vol_ratio >= 0.8 and vol_ratio < 1.5
 is_vol_dry = vol_ratio < vol_dry_mult
 
-// --- Volume Kiệt (Cạn kiệt - Hết người bán) ---
-is_vol_exhaustion = vol_ratio <= i_volDryTh  // 🚦 Volume thấp = Cạn kiệt
-
 // --- Vol Đột biến (Volume CAO + Giá biến động mạnh) ---
 atr_val = ta.atr(14)
 spread = high - low
@@ -99,6 +96,10 @@ is_vol_spike = vol_ratio >= i_volSpikeTh and is_price_moving  // ⚡ Vol đột 
 // --- Spread Analysis ---
 is_spread_wide = spread > atr_val * 1.5
 is_spread_narrow = spread < atr_val * spread_narrow
+
+// --- Volume Cạn Kiệt (Dry Volume) ---
+// Vol thấp + Giá đi ngang (biên độ hẹp) = Hết người bán, đang tích lũy
+is_vol_exhaustion = vol_ratio <= i_volDryTh and is_spread_narrow  // 🚦 Tín hiệu tích lũy
 
 // --- Candle Character ---
 is_bullish = close > open
