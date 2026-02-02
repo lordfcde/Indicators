@@ -35,10 +35,10 @@ sell_cooldown = input.int(3, "Cooldown BÁN", minval=1, group=grp_cooldown)
 buy_cooldown = input.int(3, "Cooldown MUA", minval=1, group=grp_cooldown)
 
 grp_addon = "7. Cảnh Báo Đặc Biệt"
-i_vSpikeLb = input.bool(true, "Hiện 🚦 (Vol Kiệt sức)", group=grp_addon)
-i_vSpikeTh = input.float(0.3, "Ngưỡng Vol Kiệt sức (x TB)", group=grp_addon, tooltip="Volume < X lần TB = Cạn kiệt, hết người bán")
-i_hATRLb = input.bool(true, "Hiện ⚡ (Biến động lỏng lẻo)", group=grp_addon)
-i_atr_mult = input.float(2.718, "Ngưỡng Biến động (x ATR)", group=grp_addon, tooltip="Spread > X lần ATR = Biến động mạnh")
+i_volSpikeLb = input.bool(true, "Hiện ⚡ (Vol Đột biến)", group=grp_addon)
+i_volSpikeTh = input.float(2.5, "Ngưỡng Vol Đột biến (x MA20)", group=grp_addon, tooltip="Volume > X lần MA20 = Đột biến")
+i_volDryLb = input.bool(true, "Hiện 🚦 (Vol Kiệt)", group=grp_addon)
+i_volDryTh = input.float(0.3, "Ngưỡng Vol Kiệt (x MA20)", group=grp_addon, tooltip="Volume < X lần MA20 = Cạn kiệt")
 
 // ==========================================
 // 2. TÍNH TOÁN CORE
@@ -87,12 +87,16 @@ is_vol_high = vol_ratio >= 1.5 and vol_ratio < vol_climax_mult
 is_vol_normal = vol_ratio >= 0.8 and vol_ratio < 1.5
 is_vol_dry = vol_ratio < vol_dry_mult
 
-// --- Volume Kiệt sức (Cạn kiệt - Hết người bán) ---
-is_vol_exhaustion = vol_ratio <= i_vSpikeTh  // 🚦 Volume thấp = Cạn kiệt
+// --- Volume Kiệt (Cạn kiệt - Hết người bán) ---
+is_vol_exhaustion = vol_ratio <= i_volDryTh  // 🚦 Volume thấp = Cạn kiệt
 
-// --- Spread Analysis ---
+// --- Vol Đột biến (Volume CAO + Giá biến động mạnh) ---
 atr_val = ta.atr(14)
 spread = high - low
+is_price_moving = spread > atr_val * 1.5  // Giá biến động mạnh
+is_vol_spike = vol_ratio >= i_volSpikeTh and is_price_moving  // ⚡ Vol đột biến = Vol CAO + Giá động
+
+// --- Spread Analysis ---
 is_spread_wide = spread > atr_val * 1.5
 is_spread_narrow = spread < atr_val * spread_narrow
 
@@ -101,10 +105,9 @@ is_bullish = close > open
 is_bearish = close < open
 close_position = (close - low) / (high - low)
 
-// --- VOLATILITY SURGE (Biến động mạnh) ---
-// Biến động lỏng lẻo theo ATR
-is_high_volatility = spread > atr_val * i_atr_mult  // ⚡ Biến động mạnh
-is_volatility_surge = is_vol_exhaustion or is_high_volatility
+// --- VOLATILITY SURGE ---
+// Vol đột biến HOẶC Vol cạn kiệt đều là tín hiệu quan trọng
+is_volatility_surge = is_vol_spike or is_vol_exhaustion
 
 // --- VSA Patterns ---
 hidden_distribution = is_vol_climax and is_bullish and close_position < 0.4
@@ -219,11 +222,11 @@ plot(ema233, "EMA 233", color=above_ema233 ? color.lime : color.red, linewidth=4
 // 7. CẢNH BÁO (CHỈ ICONS QUAN TRỌNG)
 // ==========================================
 
-// ⚡ VOLUME ĐỘT BIẾN - Volume cao bất thường = Có sự kiện lớn
-plotshape(i_hATRLb and is_vol_climax, "⚡ Vol Đột biến", shape.diamond, location.abovebar, color.yellow, text="⚡", size=size.tiny, force_overlay=true)
+// ⚡ VOLUME ĐỘT BIẾN - Volume CAO gấp 2-3 lần MA20 + Giá biến động mạnh
+plotshape(i_volSpikeLb and is_vol_spike, "⚡ Vol Đột biến", shape.diamond, location.abovebar, color.yellow, text="⚡", size=size.small, force_overlay=true)
 
 // 🚦 VOLUME KIỆT - Volume thấp = Hết người bán = Tích cực  
-plotshape(i_vSpikeLb and is_vol_exhaustion, "🚦 Vol Kiệt", shape.circle, location.belowbar, color.lime, text="🚦", size=size.tiny, force_overlay=true)
+plotshape(i_volDryLb and is_vol_exhaustion, "🚦 Vol Kiệt", shape.circle, location.belowbar, color.lime, text="🚦", size=size.tiny, force_overlay=true)
 
 // ==========================================
 // 8. TÍN HIỆU MUA/BÁN
