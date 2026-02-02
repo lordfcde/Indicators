@@ -423,10 +423,35 @@ if barstate.islast
     res_color = ob_resistance_count == 0 ? color.green : ob_resistance_count == 1 ? color.orange : color.red
     table.cell(panel, 1, 4, res_text, text_color=res_color)
     
-    // Gợi ý (Recommendation)
+    // Gợi ý (Recommendation) - Cải thiện logic với mua/bán 1 phần
     table.cell(panel, 0, 5, "GỢI Ý:", bgcolor=color.gray, text_halign=text.align_left, text_color=color.white)
-    rec_text = ema_count_above == 3 and mf > 0 ? "MUA MẠNH 💪" : ema_count_above >= 2 and mf > 0 ? "MUA 👍" : rsi_overbought ? "CẨN THẬN ⚠️" : mf < 0 and ema_count_above <= 1 ? "BÁN 👋" : "QUAN SÁT 👀"
-    rec_bg = ema_count_above == 3 and mf > 0 ? color.lime : ema_count_above >= 2 and mf > 0 ? color.green : rsi_overbought ? color.orange : mf < 0 and ema_count_above <= 1 ? color.red : color.gray
+    
+    // Logic gợi ý chi tiết hơn
+    rec_text = ""
+    rec_bg = color.gray
+    
+    if mf > 0.1 and is_confirmed_uptrend
+        rec_text := "MUA MẠNH 💪"
+        rec_bg := color.lime
+    else if mf > 0 and mf <= 0.1 and above_ema233
+        rec_text := "MUA 1 PHẦN 👍"
+        rec_bg := color.green
+    else if mf < -0.1 and is_confirmed_downtrend
+        rec_text := "BÁN 👋"
+        rec_bg := color.red
+    else if mf < 0 and mf >= -0.1 and not above_ema233
+        rec_text := "BÁN 1 PHẦN ⚠️"
+        rec_bg := color.orange
+    else if rsi_overbought
+        rec_text := "CẨN THẬN ⚠️"
+        rec_bg := color.orange
+    else if rsi_oversold and above_ema233
+        rec_text := "CƠ HỘI MUA 🎯"
+        rec_bg := color.teal
+    else
+        rec_text := "QUAN SÁT 👀"
+        rec_bg := color.gray
+    
     table.cell(panel, 1, 5, rec_text, bgcolor=rec_bg, text_color=color.white)
 
 // ==========================================
