@@ -148,10 +148,11 @@ if is_bearish_ob
 
 // Remove mitigated OBs (price > ob_top)
 target_bear_ob = ta.highest(high, ob_length)
-for i = array.size(bear_ob_top) - 1 to 0
-    if i < array.size(bear_ob_top) and target_bear_ob > array.get(bear_ob_top, i)
-        array.remove(bear_ob_top, i)
-        array.remove(bear_ob_btm, i)
+if array.size(bear_ob_top) > 0
+    for i = array.size(bear_ob_top) - 1 to 0
+        if i < array.size(bear_ob_top) and target_bear_ob > array.get(bear_ob_top, i)
+            array.remove(bear_ob_top, i)
+            array.remove(bear_ob_btm, i)
 
 // Count active Bearish OBs above current price (resistance)
 ob_resistance_count = 0
