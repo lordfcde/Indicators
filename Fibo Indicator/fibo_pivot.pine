@@ -1,185 +1,123 @@
 //@version=6
 // ══════════════════════════════════════════════════════════════════════════════════════════════════ //
 //# * Simplified Fibonacci Pivot Points
-//# * Author: © Vinh (Based on dgtrd)
-//# * Features: Auto HTF, Pivot Points with Price Labels
+//# * Author: © Vinh
+//# * Features: Auto HTF, Pivot Points with Custom Levels & Colors
 // ══════════════════════════════════════════════════════════════════════════════════════════════════ //
 
-indicator('Fibo Pivot Points', 'FIB PP', true, max_lines_count = 100, max_labels_count = 100)
+indicator('Fibo Pivot Points', 'FIB PP', true, max_lines_count = 50, max_labels_count = 50)
 
 // ==========================================
 // SETTINGS
 // ==========================================
-group_pp = 'Pivot Points Settings'
+group_pp = '📊 Pivot Points'
 
-i_showLabels = input.bool(true, 'Hiện Labels với Giá', group = group_pp, tooltip = 'Hiển thị tên level và giá trên mỗi đường Pivot')
+i_showLabels = input.bool(true, 'Hiện Labels với Giá', group = group_pp)
 i_extend = input.bool(false, 'Mở rộng đường Pivot', group = group_pp)
-i_histPP = input.bool(false, 'Pivot Points Lịch sử', group = group_pp)
 
-// Fibonacci Levels (có thể tùy chỉnh)
-group_levels = 'Fibonacci Levels'
+// Fibonacci Levels - User có thể tùy chỉnh từng level
+group_levels = '🎨 Fibonacci Levels'
 
-show_pp = input.bool(true, '', inline = 'L0', group = group_levels)
-color_pp = input.color(#787b86, 'PP (Pivot)', inline = 'L0', group = group_levels)
+show_pp = input.bool(true, 'PP (Pivot Point)', inline = 'pp', group = group_levels)
+color_pp = input.color(#888888, '', inline = 'pp', group = group_levels)
 
-show_382 = input.bool(true, '', inline = 'L1', group = group_levels)
-color_382 = input.color(#81c784, 'S1/R1 (0.382)', inline = 'L1', group = group_levels)
+show_s1 = input.bool(true, 'S1 (Support 1)', inline = 's1', group = group_levels)
+level_s1 = input.float(0.382, '', inline = 's1', group = group_levels)
+color_s1 = input.color(#4CAF50, '', inline = 's1', group = group_levels)
 
-show_618 = input.bool(true, '', inline = 'L2', group = group_levels)
-color_618 = input.color(#009688, 'S2/R2 (0.618)', inline = 'L2', group = group_levels)
+show_r1 = input.bool(true, 'R1 (Resistance 1)', inline = 'r1', group = group_levels)
+level_r1 = input.float(0.382, '', inline = 'r1', group = group_levels)
+color_r1 = input.color(#F44336, '', inline = 'r1', group = group_levels)
 
-show_1 = input.bool(true, '', inline = 'L3', group = group_levels)
-color_1 = input.color(#2196f3, 'S3/R3 (1.0)', inline = 'L3', group = group_levels)
+show_s2 = input.bool(true, 'S2 (Support 2)', inline = 's2', group = group_levels)
+level_s2 = input.float(0.618, '', inline = 's2', group = group_levels)
+color_s2 = input.color(#00BCD4, '', inline = 's2', group = group_levels)
 
-show_1618 = input.bool(false, '', inline = 'L4', group = group_levels)
-color_1618 = input.color(#f44336, 'S4/R4 (1.618)', inline = 'L4', group = group_levels)
+show_r2 = input.bool(true, 'R2 (Resistance 2)', inline = 'r2', group = group_levels)
+level_r2 = input.float(0.618, '', inline = 'r2', group = group_levels)
+color_r2 = input.color(#FF5722, '', inline = 'r2', group = group_levels)
+
+show_s3 = input.bool(true, 'S3 (Support 3)', inline = 's3', group = group_levels)
+level_s3 = input.float(1.0, '', inline = 's3', group = group_levels)
+color_s3 = input.color(#2196F3, '', inline = 's3', group = group_levels)
+
+show_r3 = input.bool(true, 'R3 (Resistance 3)', inline = 'r3', group = group_levels)
+level_r3 = input.float(1.0, '', inline = 'r3', group = group_levels)
+color_r3 = input.color(#E91E63, '', inline = 'r3', group = group_levels)
 
 // ==========================================
-// AUTO TIMEFRAME DETECTION
+// AUTO TIMEFRAME DETECTION (Tránh trùng lặp)
 // ==========================================
-htf =
-     timeframe.isintraday and (
-         timeframe.period == '1'  or
-         timeframe.period == '3'  or
-         timeframe.period == '5'  or
-         timeframe.period == '15'
-     ) ? 'D' :
-
-     timeframe.isintraday and (
-         timeframe.period == '30'  or
-         timeframe.period == '45'  or
-         timeframe.period == '60'  or
-         timeframe.period == '120' or
-         timeframe.period == '180' or
-         timeframe.period == '240'
-     ) ? 'W' :
-
-     timeframe.isdaily  ? 'M'  :
-     timeframe.isweekly or timeframe.ismonthly ? '12M' :
-     '3M'
+htf = 
+     timeframe.period == '1' or timeframe.period == '3' or timeframe.period == '5' ? 'D' :
+     timeframe.period == '15' or timeframe.period == '30' ? 'D' :
+     timeframe.period == '60' or timeframe.period == '120' or timeframe.period == '240' ? 'W' :
+     timeframe.period == 'D' ? 'M' :
+     timeframe.period == 'W' ? '3M' :
+     timeframe.period == 'M' ? '12M' :
+     'W'
 
 // ==========================================
 // HTF OHLC CALCULATION
 // ==========================================
-f_htf_ohlc(_htf) =>
-    var htf_h = 0.
-    var htf_l = 0.
-    htf_c = close
-
-    var htf_hx = 0.
-    var htf_lx = 0.
-    var htf_cx = 0.
-
-    if timeframe.change(_htf)
-        htf_hx := htf_h
-        htf_h := high
-
-        htf_lx := htf_l
-        htf_l := low
-
-        htf_cx := htf_c[1]
-    else
-        htf_h := math.max(high, htf_h)
-        htf_l := math.min(low, htf_l)
-
-    [htf_hx, htf_lx, htf_cx]
-
-[htf_h1, htf_l1, htf_c1] = f_htf_ohlc(htf)
+[htf_h, htf_l, htf_c] = request.security(syminfo.tickerid, htf, [high[1], low[1], close[1]], lookahead = barmerge.lookahead_on)
 
 // ==========================================
 // PIVOT POINT CALCULATIONS
 // ==========================================
-pivot = math.avg(htf_h1, htf_l1, htf_c1)
-range_pp = htf_h1 - htf_l1
+pivot = (htf_h + htf_l + htf_c) / 3
+range_pp = htf_h - htf_l
 
-// Support & Resistance levels
-s1 = pivot - range_pp * 0.382
-r1 = pivot + range_pp * 0.382
-s2 = pivot - range_pp * 0.618
-r2 = pivot + range_pp * 0.618
-s3 = pivot - range_pp * 1.0
-r3 = pivot + range_pp * 1.0
-s4 = pivot - range_pp * 1.618
-r4 = pivot + range_pp * 1.618
+// Support & Resistance levels với tỉ lệ tùy chỉnh
+s1 = pivot - range_pp * level_s1
+r1 = pivot + range_pp * level_r1
+s2 = pivot - range_pp * level_s2
+r2 = pivot + range_pp * level_r2
+s3 = pivot - range_pp * level_s3
+r3 = pivot + range_pp * level_r3
 
 // ==========================================
-// TIME CALCULATIONS FOR LINES
+// DRAWING
 // ==========================================
-time_x10 = ta.valuewhen(bool(ta.change(time(htf))), time, 1)
-time_x11 = ta.valuewhen(bool(ta.change(time(htf))), time, 0)
-time_x21 = 2 * time_x11 - time_x10
+f_label(_price, _name, _color) =>
+    if i_showLabels
+        _name + ' (' + str.tostring(_price, format.mintick) + ')'
+    else
+        _name
 
-// ==========================================
-// DRAWING FUNCTIONS
-// ==========================================
-var ln = array.new_line()
-var lb = array.new_label()
+// Plot lines - mỗi level một plot riêng biệt
+plot(show_pp ? pivot : na, 'PP', color_pp, 2, plot.style_line)
+plot(show_s1 ? s1 : na, 'S1', color_s1, 2, plot.style_line)
+plot(show_r1 ? r1 : na, 'R1', color_r1, 2, plot.style_line)
+plot(show_s2 ? s2 : na, 'S2', color_s2, 2, plot.style_line)
+plot(show_r2 ? r2 : na, 'R2', color_r2, 2, plot.style_line)
+plot(show_s3 ? s3 : na, 'S3', color_s3, 2, plot.style_line)
+plot(show_r3 ? r3 : na, 'R3', color_r3, 2, plot.style_line)
 
-if bool(ta.change(time)) and array.size(ln) > 0
-    for i = 1 to array.size(ln)
-        line.delete(array.shift(ln))
-
-if bool(ta.change(time)) and array.size(lb) > 0
-    for i = 1 to array.size(lb)
-        label.delete(array.shift(lb))
-
-f_drawPivotLine(_y, _color, _width, _name) =>
-    if _y > 0
-        lineStyle = _width > 1 ? line.style_solid : line.style_dashed
-        extendMode = i_extend ? extend.both : extend.none
-        array.push(ln, line.new(time_x11, _y, time_x21, _y, xloc.bar_time, extendMode, _color, lineStyle, _width))
-        
-        if i_showLabels
-            priceText = _name + ' (' + str.tostring(_y, format.mintick) + ')'
-            array.push(lb, label.new(time_x21, _y, priceText, xloc.bar_time, yloc.price, color.new(color.white, 100), label.style_label_left, _color, size.small, text.align_left, str.tostring(_y, format.mintick)))
-
-// ==========================================
-// DRAW PIVOT POINTS
-// ==========================================
-if show_pp
-    f_drawPivotLine(pivot, color_pp, 2, 'PP')
-
-if show_382
-    f_drawPivotLine(s1, color_382, 2, 'S1')
-    f_drawPivotLine(r1, color_382, 2, 'R1')
-
-if show_618
-    f_drawPivotLine(s2, color_618, 2, 'S2')
-    f_drawPivotLine(r2, color_618, 2, 'R2')
-
-if show_1
-    f_drawPivotLine(s3, color_1, 2, 'S3')
-    f_drawPivotLine(r3, color_1, 2, 'R3')
-
-if show_1618
-    f_drawPivotLine(s4, color_1618, 1, 'S4')
-    f_drawPivotLine(r4, color_1618, 1, 'R4')
-
-// ==========================================
-// HISTORICAL PIVOT POINTS (PLOTS)
-// ==========================================
-plot(i_histPP and show_pp ? pivot : na, 'PP', bool(ta.change(time(htf))) ? na : color_pp, 2, editable = false)
-plot(i_histPP and show_382 ? s1 : na, 'S1', bool(ta.change(time(htf))) ? na : color_382, editable = false)
-plot(i_histPP and show_382 ? r1 : na, 'R1', bool(ta.change(time(htf))) ? na : color_382, editable = false)
-plot(i_histPP and show_618 ? s2 : na, 'S2', bool(ta.change(time(htf))) ? na : color_618, editable = false)
-plot(i_histPP and show_618 ? r2 : na, 'R2', bool(ta.change(time(htf))) ? na : color_618, editable = false)
-plot(i_histPP and show_1 ? s3 : na, 'S3', bool(ta.change(time(htf))) ? na : color_1, editable = false)
-plot(i_histPP and show_1 ? r3 : na, 'R3', bool(ta.change(time(htf))) ? na : color_1, editable = false)
-plot(i_histPP and show_1618 ? s4 : na, 'S4', bool(ta.change(time(htf))) ? na : color_1618, 1, plot.style_cross, editable = false)
-plot(i_histPP and show_1618 ? r4 : na, 'R4', bool(ta.change(time(htf))) ? na : color_1618, 1, plot.style_cross, editable = false)
+// Labels ở cuối (chỉ vẽ 1 lần trên bar cuối)
+if barstate.islast and i_showLabels
+    if show_pp
+        label.new(bar_index + 5, pivot, f_label(pivot, 'PP', color_pp), xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color_pp, size.small)
+    if show_s1
+        label.new(bar_index + 5, s1, f_label(s1, 'S1', color_s1), xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color_s1, size.small)
+    if show_r1
+        label.new(bar_index + 5, r1, f_label(r1, 'R1', color_r1), xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color_r1, size.small)
+    if show_s2
+        label.new(bar_index + 5, s2, f_label(s2, 'S2', color_s2), xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color_s2, size.small)
+    if show_r2
+        label.new(bar_index + 5, r2, f_label(r2, 'R2', color_r2), xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color_r2, size.small)
+    if show_s3
+        label.new(bar_index + 5, s3, f_label(s3, 'S3', color_s3), xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color_s3, size.small)
+    if show_r3
+        label.new(bar_index + 5, r3, f_label(r3, 'R3', color_r3), xloc.bar_index, yloc.price, color.new(color.white, 100), label.style_label_left, color_r3, size.small)
 
 // ==========================================
 // ALERTS
 // ==========================================
-f_crossing(_level) => _level > close and _level < close[1] or _level < close and _level > close[1]
+f_crossing(_level) => ta.cross(close, _level)
 
-alertcondition(f_crossing(pivot), 'Cross PP', 'Price crossing Pivot Point')
-alertcondition(f_crossing(s1) or f_crossing(r1), 'Cross S1/R1', 'Price crossing S1 or R1')
-alertcondition(f_crossing(s2) or f_crossing(r2), 'Cross S2/R2', 'Price crossing S2 or R2')
-alertcondition(f_crossing(s3) or f_crossing(r3), 'Cross S3/R3', 'Price crossing S3 or R3')
-
-// ==========================================
-// LOGO
-// ==========================================
-var table logo = table.new(position.bottom_right, 1, 1)
-table.cell(logo, 0, 0, 'FIB PP', text_size = size.tiny, text_color = color.teal)
+alertcondition(f_crossing(pivot), 'Cross PP', 'Giá cắt Pivot Point')
+alertcondition(f_crossing(s1), 'Cross S1', 'Giá cắt Support 1')
+alertcondition(f_crossing(r1), 'Cross R1', 'Giá cắt Resistance 1')
+alertcondition(f_crossing(s2), 'Cross S2', 'Giá cắt Support 2')
+alertcondition(f_crossing(r2), 'Cross R2', 'Giá cắt Resistance 2')
