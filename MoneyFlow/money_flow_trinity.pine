@@ -68,6 +68,23 @@ above_ema233 = close > ema233
 ema_count_above = (above_ema50 ? 1 : 0) + (above_ema144 ? 1 : 0) + (above_ema233 ? 1 : 0)
 resistance_count = 3 - ema_count_above
 
+// Đếm số nến liên tiếp trên/dưới EMA233 để xác nhận xu hướng
+var int candles_above_ema233 = 0
+var int candles_below_ema233 = 0
+
+if above_ema233
+    candles_above_ema233 := candles_above_ema233 + 1
+    candles_below_ema233 := 0
+else
+    candles_below_ema233 := candles_below_ema233 + 1
+    candles_above_ema233 := 0
+
+// Cần ít nhất 3 nến liên tiếp để xác nhận xu hướng
+trend_confirm_count = 3
+is_confirmed_uptrend = candles_above_ema233 >= trend_confirm_count
+is_confirmed_downtrend = candles_below_ema233 >= trend_confirm_count
+is_waiting_signal = not is_confirmed_uptrend and not is_confirmed_downtrend
+
 // --- RSI ---
 rsi_val = ta.rsi(close, rsi_len)
 rsi_overbought = rsi_val > rsi_ob
@@ -390,9 +407,11 @@ if barstate.islast
     cmf_text = mf > 0.1 ? "VÀO MẠNH 🔥" : mf > 0 ? "VÀO NHẸ ✅" : mf > -0.1 ? "RA NHẸ ⚠️" : "RA MẠNH ❌"
     table.cell(panel, 1, 1, cmf_text, bgcolor=mf > 0 ? color.lime : color.red, text_color=color.white)
     
-    // Trung hạn (EMA233)
+    // Trung hạn (EMA233) - Cần 3 nến liên tiếp để xác nhận xu hướng
     table.cell(panel, 0, 2, "Trung hạn:", bgcolor=color.white, text_halign=text.align_left)
-    table.cell(panel, 1, 2, above_ema233 ? "UPTREND ✅" : "DOWNTREND ❌", text_color=above_ema233 ? color.green : color.red)
+    trend_text = is_confirmed_uptrend ? "UPTREND ✅" : is_confirmed_downtrend ? "DOWNTREND ❌" : above_ema233 ? "ĐỢI TÍN HIỆU ⏳" : "ĐỢI TÍN HIỆU ⏳"
+    trend_color = is_confirmed_uptrend ? color.green : is_confirmed_downtrend ? color.red : color.orange
+    table.cell(panel, 1, 2, trend_text, text_color=trend_color)
     
     // Lướt sóng (EMA50)
     table.cell(panel, 0, 3, "Lướt sóng:", bgcolor=color.white, text_halign=text.align_left)
