@@ -6,39 +6,37 @@
 indicator(title="CS Trinity Master VSA", shorttitle="CS_Trinity_VSA", format=format.price, precision=2, max_lines_count=100)
 
 // ==========================================
-// 1. CẤU HÌNH
+// 1. CẤU HÌNH NGƯỜI DÙNG
 // ==========================================
-grp_cmf = "1. CMF (Dòng Tiền)"
-cmf_len = input.int(20, "CMF Length", group=grp_cmf)
+grp_ema = "📈 EMA Settings"
+ema1_len = input.int(50, "EMA Ngắn hạn (Lướt sóng)", group=grp_ema)
+ema2_len = input.int(144, "EMA Trung hạn", group=grp_ema)
+ema3_len = input.int(233, "EMA Dài hạn", group=grp_ema)
 
-grp_ck = "2. Chaikin Oscillator"
-ck_fast = input.int(3, "Fast", group=grp_ck)
-ck_slow = input.int(10, "Slow", group=grp_ck)
+grp_display = "🎨 Hiển Thị"
+i_volSpikeLb = input.bool(true, "Hiện ⚡ Vol Đột biến", group=grp_display, tooltip="Volume cao gấp 2.5x MA20 + Giá biến động mạnh")
+i_volDryLb = input.bool(true, "Hiện 🚦 Vol Cạn kiệt", group=grp_display, tooltip="Volume thấp + Giá đi ngang = Tích lũy")
+i_candleColoring = input.bool(true, "Tô màu nến theo biến động", group=grp_display, tooltip="Nến đậm = biến động mạnh, nến nhạt = biến động yếu")
 
-grp_eom = "3. EOM"
-eom_len = input.int(14, "Length", group=grp_eom)
-eom_div = input.int(10000, "Divisor", group=grp_eom)
-
-grp_vsa = "4. Wyckoff VSA"
-vol_climax_mult = input.float(2.0, "Volume Climax (x TB)", group=grp_vsa)
-vol_dry_mult = input.float(0.5, "Volume Cạn (x TB)", group=grp_vsa)
-spread_narrow = input.float(0.5, "Spread Hẹp (x ATR)", group=grp_vsa)
-
-grp_rsi = "5. RSI Divergence"
-rsi_len = input.int(14, "RSI Length", group=grp_rsi)
-rsi_ob = input.int(70, "Overbought", group=grp_rsi)
-rsi_os = input.int(30, "Oversold", group=grp_rsi)
-pivot_lookback = input.int(5, "Pivot Lookback", group=grp_rsi)
-
-grp_cooldown = "6. Chống Nhiễu"
-sell_cooldown = input.int(3, "Cooldown BÁN", minval=1, group=grp_cooldown)
-buy_cooldown = input.int(3, "Cooldown MUA", minval=1, group=grp_cooldown)
-
-grp_addon = "7. Cảnh Báo Đặc Biệt"
-i_volSpikeLb = input.bool(true, "Hiện ⚡ (Vol Đột biến)", group=grp_addon)
-i_volSpikeTh = input.float(2.5, "Ngưỡng Vol Đột biến (x MA20)", group=grp_addon, tooltip="Volume > X lần MA20 = Đột biến")
-i_volDryLb = input.bool(true, "Hiện 🚦 (Vol Kiệt)", group=grp_addon)
-i_volDryTh = input.float(0.3, "Ngưỡng Vol Kiệt (x MA20)", group=grp_addon, tooltip="Volume < X lần MA20 = Cạn kiệt")
+// ==========================================
+// CÀI ĐẶT NỘI BỘ (ẨN)
+// ==========================================
+cmf_len = 20
+ck_fast = 3
+ck_slow = 10
+eom_len = 14
+eom_div = 10000
+vol_climax_mult = 2.0
+vol_dry_mult = 0.5
+spread_narrow = 0.5
+rsi_len = 14
+rsi_ob = 70
+rsi_os = 30
+pivot_lookback = 5
+sell_cooldown = 3
+buy_cooldown = 3
+i_volSpikeTh = 2.5
+i_volDryTh = 0.3
 
 // ==========================================
 // 2. TÍNH TOÁN CORE
@@ -58,10 +56,10 @@ br = (volume / eom_div) / ((high - low) != 0 ? (high - low) : 1)
 eom_inst = br != 0 ? dm / br : 0
 eom_raw = ta.sma(eom_inst, eom_len)
 
-// --- EMAs ---
-ema50 = ta.ema(close, 50)
-ema144 = ta.ema(close, 144)
-ema233 = ta.ema(close, 233)
+// --- EMAs (Có thể tùy chỉnh) ---
+ema50 = ta.ema(close, ema1_len)
+ema144 = ta.ema(close, ema2_len)
+ema233 = ta.ema(close, ema3_len)
 
 above_ema50 = close > ema50
 above_ema144 = close > ema144
@@ -195,8 +193,8 @@ transparency = volatility_score >= 3.0 ? 0 :    // Biến động cực mạnh =
                volatility_score >= 0.5 ? 70 :   // Yếu
                85                                // Rất yếu = Nhạt nhất
 
-// Màu nến theo xu hướng + độ đậm theo biến động
-candle_color = is_bullish ? color.new(color.green, transparency) : color.new(color.red, transparency)
+// Màu nến theo xu hướng + độ đậm theo biến động (nếu bật)
+candle_color = i_candleColoring ? (is_bullish ? color.new(color.green, transparency) : color.new(color.red, transparency)) : na
 
 barcolor(candle_color)
 
