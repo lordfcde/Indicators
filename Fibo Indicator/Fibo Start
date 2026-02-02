@@ -187,53 +187,55 @@ plot(l12_show ? calcS(l12_ratio) : na, "S12", l12_color, l12_style == "Solid" ? 
 plot(l13_show ? calcS(l13_ratio) : na, "S13", l13_color, l13_style == "Solid" ? 2 : 1, l13_style == "Solid" ? plot.style_line : plot.style_linebr)
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// LABEL HELPER FUNCTION
+// ═══════════════════════════════════════════════════════════════════════════════
+getLabelText(name, ratio, price, showLabel, showPrice) =>
+    txt = showLabel ? name + " " + str.tostring(ratio) : ""
+    txt += showPrice ? " (" + str.tostring(price, format.mintick) + ")" : ""
+    txt
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // LABELS
 // ═══════════════════════════════════════════════════════════════════════════════
+labelStyle = positionLabelsInput == "Left" ? label.style_label_right : label.style_label_left
+xPos = positionLabelsInput == "Left" ? bar_index - 10 : bar_index + 10
+
 if barstate.islast and (showLabelsInput or showPricesInput)
-    labelStyle = positionLabelsInput == "Left" ? label.style_label_right : label.style_label_left
-    xPos = positionLabelsInput == "Left" ? bar_index - 10 : bar_index + 10
-    
-    // Helper function for label text
-    getLabelText(name, ratio, price) =>
-        txt = showLabelsInput ? name + " " + str.tostring(ratio) : ""
-        txt += showPricesInput ? " (" + str.tostring(price, format.mintick) + ")" : ""
-        txt
-    
     // PP Label
     if pp_show
-        label.new(xPos, pivot, getLabelText("PP", 0, pivot), style=labelStyle, color=#00000000, textcolor=pp_color, size=size.small)
+        label.new(xPos, pivot, getLabelText("PP", 0.0, pivot, showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=pp_color, size=size.small)
     
     // R/S Labels
     if l1_show
-        label.new(xPos, calcR(l1_ratio), getLabelText("R1 PP", l1_ratio, calcR(l1_ratio)), style=labelStyle, color=#00000000, textcolor=l1_color, size=size.small)
-        label.new(xPos, calcS(l1_ratio), getLabelText("S1 PP", l1_ratio, calcS(l1_ratio)), style=labelStyle, color=#00000000, textcolor=l1_color, size=size.small)
+        label.new(xPos, calcR(l1_ratio), getLabelText("R1 PP", l1_ratio, calcR(l1_ratio), showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=l1_color, size=size.small)
+        label.new(xPos, calcS(l1_ratio), getLabelText("S1 PP", l1_ratio, calcS(l1_ratio), showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=l1_color, size=size.small)
     if l2_show
-        label.new(xPos, calcR(l2_ratio), getLabelText("R2 PP", l2_ratio, calcR(l2_ratio)), style=labelStyle, color=#00000000, textcolor=l2_color, size=size.small)
-        label.new(xPos, calcS(l2_ratio), getLabelText("S2 PP", l2_ratio, calcS(l2_ratio)), style=labelStyle, color=#00000000, textcolor=l2_color, size=size.small)
+        label.new(xPos, calcR(l2_ratio), getLabelText("R2 PP", l2_ratio, calcR(l2_ratio), showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=l2_color, size=size.small)
+        label.new(xPos, calcS(l2_ratio), getLabelText("S2 PP", l2_ratio, calcS(l2_ratio), showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=l2_color, size=size.small)
     if l3_show
-        label.new(xPos, calcR(l3_ratio), getLabelText("R3 PP", l3_ratio, calcR(l3_ratio)), style=labelStyle, color=#00000000, textcolor=l3_color, size=size.small)
-        label.new(xPos, calcS(l3_ratio), getLabelText("S3 PP", l3_ratio, calcS(l3_ratio)), style=labelStyle, color=#00000000, textcolor=l3_color, size=size.small)
+        label.new(xPos, calcR(l3_ratio), getLabelText("R3 PP", l3_ratio, calcR(l3_ratio), showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=l3_color, size=size.small)
+        label.new(xPos, calcS(l3_ratio), getLabelText("S3 PP", l3_ratio, calcS(l3_ratio), showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=l3_color, size=size.small)
     if l4_show
-        label.new(xPos, calcR(l4_ratio), getLabelText("R4 PP", l4_ratio, calcR(l4_ratio)), style=labelStyle, color=#00000000, textcolor=l4_color, size=size.small)
-        label.new(xPos, calcS(l4_ratio), getLabelText("S4 PP", l4_ratio, calcS(l4_ratio)), style=labelStyle, color=#00000000, textcolor=l4_color, size=size.small)
+        label.new(xPos, calcR(l4_ratio), getLabelText("R4 PP", l4_ratio, calcR(l4_ratio), showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=l4_color, size=size.small)
+        label.new(xPos, calcS(l4_ratio), getLabelText("S4 PP", l4_ratio, calcS(l4_ratio), showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=l4_color, size=size.small)
     if l5_show
-        label.new(xPos, calcR(l5_ratio), getLabelText("R5 PP", l5_ratio, calcR(l5_ratio)), style=labelStyle, color=#00000000, textcolor=l5_color, size=size.small)
-        label.new(xPos, calcS(l5_ratio), getLabelText("S5 PP", l5_ratio, calcS(l5_ratio)), style=labelStyle, color=#00000000, textcolor=l5_color, size=size.small)
+        label.new(xPos, calcR(l5_ratio), getLabelText("R5 PP", l5_ratio, calcR(l5_ratio), showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=l5_color, size=size.small)
+        label.new(xPos, calcS(l5_ratio), getLabelText("S5 PP", l5_ratio, calcS(l5_ratio), showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=l5_color, size=size.small)
     if l6_show
-        label.new(xPos, calcR(l6_ratio), getLabelText("R6 PP", l6_ratio, calcR(l6_ratio)), style=labelStyle, color=#00000000, textcolor=l6_color, size=size.small)
-        label.new(xPos, calcS(l6_ratio), getLabelText("S6 PP", l6_ratio, calcS(l6_ratio)), style=labelStyle, color=#00000000, textcolor=l6_color, size=size.small)
+        label.new(xPos, calcR(l6_ratio), getLabelText("R6 PP", l6_ratio, calcR(l6_ratio), showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=l6_color, size=size.small)
+        label.new(xPos, calcS(l6_ratio), getLabelText("S6 PP", l6_ratio, calcS(l6_ratio), showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=l6_color, size=size.small)
     if l7_show
-        label.new(xPos, calcR(l7_ratio), getLabelText("R7 PP", l7_ratio, calcR(l7_ratio)), style=labelStyle, color=#00000000, textcolor=l7_color, size=size.small)
-        label.new(xPos, calcS(l7_ratio), getLabelText("S7 PP", l7_ratio, calcS(l7_ratio)), style=labelStyle, color=#00000000, textcolor=l7_color, size=size.small)
+        label.new(xPos, calcR(l7_ratio), getLabelText("R7 PP", l7_ratio, calcR(l7_ratio), showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=l7_color, size=size.small)
+        label.new(xPos, calcS(l7_ratio), getLabelText("S7 PP", l7_ratio, calcS(l7_ratio), showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=l7_color, size=size.small)
     if l8_show
-        label.new(xPos, calcR(l8_ratio), getLabelText("R8 PP", l8_ratio, calcR(l8_ratio)), style=labelStyle, color=#00000000, textcolor=l8_color, size=size.small)
-        label.new(xPos, calcS(l8_ratio), getLabelText("S8 PP", l8_ratio, calcS(l8_ratio)), style=labelStyle, color=#00000000, textcolor=l8_color, size=size.small)
+        label.new(xPos, calcR(l8_ratio), getLabelText("R8 PP", l8_ratio, calcR(l8_ratio), showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=l8_color, size=size.small)
+        label.new(xPos, calcS(l8_ratio), getLabelText("S8 PP", l8_ratio, calcS(l8_ratio), showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=l8_color, size=size.small)
     if l9_show
-        label.new(xPos, calcR(l9_ratio), getLabelText("R9 PP", l9_ratio, calcR(l9_ratio)), style=labelStyle, color=#00000000, textcolor=l9_color, size=size.small)
-        label.new(xPos, calcS(l9_ratio), getLabelText("S9 PP", l9_ratio, calcS(l9_ratio)), style=labelStyle, color=#00000000, textcolor=l9_color, size=size.small)
+        label.new(xPos, calcR(l9_ratio), getLabelText("R9 PP", l9_ratio, calcR(l9_ratio), showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=l9_color, size=size.small)
+        label.new(xPos, calcS(l9_ratio), getLabelText("S9 PP", l9_ratio, calcS(l9_ratio), showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=l9_color, size=size.small)
     if l10_show
-        label.new(xPos, calcR(l10_ratio), getLabelText("R10 PP", l10_ratio, calcR(l10_ratio)), style=labelStyle, color=#00000000, textcolor=l10_color, size=size.small)
-        label.new(xPos, calcS(l10_ratio), getLabelText("S10 PP", l10_ratio, calcS(l10_ratio)), style=labelStyle, color=#00000000, textcolor=l10_color, size=size.small)
+        label.new(xPos, calcR(l10_ratio), getLabelText("R10 PP", l10_ratio, calcR(l10_ratio), showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=l10_color, size=size.small)
+        label.new(xPos, calcS(l10_ratio), getLabelText("S10 PP", l10_ratio, calcS(l10_ratio), showLabelsInput, showPricesInput), style=labelStyle, color=#00000000, textcolor=l10_color, size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ALERTS
