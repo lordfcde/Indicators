@@ -22,7 +22,6 @@ pivotAnchorInput = input.string(title="Pivots Timeframe", defval="Auto", options
 showLabelsInput = input.bool(title="Show Labels", defval=true, group=group_main)
 showPricesInput = input.bool(title="Show Prices", defval=true, group=group_main)
 positionLabelsInput = input.string("Right", "Labels Position", options=["Left", "Right"], group=group_main)
-maxHistoricalPivots = input.int(title="Number of Pivots Back", defval=5, minval=1, maxval=50, group=group_main)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // FIBONACCI LEVELS - 13 Levels with ratios + LINE STYLE
@@ -117,45 +116,24 @@ l13_style = input.string("Dashed", "", options=["Solid", "Dashed", "Dotted"], in
 // AUTO TIMEFRAME - Context-aware
 // ═══════════════════════════════════════════════════════════════════════════════
 autoAnchor = switch
-    timeframe.isintraday and timeframe.multiplier <= 15 => "1D"      // Intraday ≤ 15 min → Daily
-    timeframe.isintraday and timeframe.multiplier <= 240 => "1W"     // Intraday 30-240 min → Weekly
-    timeframe.isdaily => "1M"                                         // Daily → Monthly
-    timeframe.isweekly or timeframe.ismonthly => "12M"               // Weekly/Monthly → Yearly
-    => "1M"
+    timeframe.isintraday and timeframe.multiplier <= 15 => "D"
+    timeframe.isintraday and timeframe.multiplier <= 240 => "W"
+    timeframe.isdaily => "M"
+    timeframe.isweekly or timeframe.ismonthly => "12M"
+    => "M"
 
 pivotTimeframe = switch pivotAnchorInput
     "Auto"      => autoAnchor
-    "Daily"     => "1D"
-    "Weekly"    => "1W"
-    "Monthly"   => "1M"
+    "Daily"     => "D"
+    "Weekly"    => "W"
+    "Monthly"   => "M"
     "Quarterly" => "3M"
     => "12M"
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// HTF OHLC DATA
+// HTF OHLC DATA - Using request.security for reliability
 // ═══════════════════════════════════════════════════════════════════════════════
-f_htf_ohlc(_htf) =>
-    var float htf_h = na
-    var float htf_l = na
-    var float htf_c = na
-    var float prev_h = na
-    var float prev_l = na
-    var float prev_c = na
-    
-    if timeframe.change(_htf)
-        prev_h := htf_h
-        prev_l := htf_l
-        prev_c := htf_c
-        htf_h := high
-        htf_l := low
-    else
-        htf_h := math.max(nz(htf_h), high)
-        htf_l := math.min(nz(htf_l, low), low)
-    
-    htf_c := close
-    [prev_h, prev_l, prev_c]
-
-[htf_h, htf_l, htf_c] = f_htf_ohlc(pivotTimeframe)
+[htf_h, htf_l, htf_c] = request.security(syminfo.tickerid, pivotTimeframe, [high[1], low[1], close[1]], lookahead=barmerge.lookahead_on)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PIVOT CALCULATIONS
@@ -168,79 +146,94 @@ getLineStyle(styleStr) =>
     styleStr == "Solid" ? line.style_solid : styleStr == "Dashed" ? line.style_dashed : line.style_dotted
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// DRAWING ARRAYS
+// PLOTTING LEVELS
 // ═══════════════════════════════════════════════════════════════════════════════
-var lines_arr = array.new_line()
-var labels_arr = array.new_label()
 
-// Clean old drawings
-if barstate.islast
-    while array.size(lines_arr) > 0
-        line.delete(array.shift(lines_arr))
-    while array.size(labels_arr) > 0
-        label.delete(array.shift(labels_arr))
+// Plot PP
+plot(pp_show and pp_ratio == 0 ? pivot : na, "PP", pp_color, 2, plot.style_line)
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// DRAW FUNCTION
-// ═══════════════════════════════════════════════════════════════════════════════
-drawPivotLevel(show, ratio, col, styleStr, levelNum) =>
-    if show and not na(pivot) and not na(range_hl) and barstate.islast
-        priceR = pivot + range_hl * ratio
-        priceS = pivot - range_hl * ratio
-        
-        lineStyle = getLineStyle(styleStr)
-        lineWidth = styleStr == "Solid" ? 2 : 1
-        
-        time_start = ta.valuewhen(timeframe.change(pivotTimeframe), time, 0)
-        time_end = time_start + timeframe.in_seconds(pivotTimeframe) * 1000
-        labelTime = positionLabelsInput == "Left" ? time_start : time_end
-        labelStyle = positionLabelsInput == "Left" ? label.style_label_right : label.style_label_left
-        
-        if ratio == 0.0
-            ln = line.new(time_start, pivot, time_end, pivot, xloc=xloc.bar_time, color=col, width=lineWidth, style=lineStyle)
-            array.push(lines_arr, ln)
-            
-            labelText = showLabelsInput ? "PP" : ""
-            priceText = showPricesInput ? " (" + str.tostring(pivot, format.mintick) + ")" : ""
-            if labelText != "" or priceText != ""
-                lb = label.new(labelTime, pivot, labelText + priceText, xloc=xloc.bar_time, style=labelStyle, color=#00000000, textcolor=col, size=size.small)
-                array.push(labels_arr, lb)
-        else
-            lnR = line.new(time_start, priceR, time_end, priceR, xloc=xloc.bar_time, color=col, width=lineWidth, style=lineStyle)
-            array.push(lines_arr, lnR)
-            
-            lnS = line.new(time_start, priceS, time_end, priceS, xloc=xloc.bar_time, color=col, width=lineWidth, style=lineStyle)
-            array.push(lines_arr, lnS)
-            
-            rName = "R" + str.tostring(levelNum) + " PP " + str.tostring(ratio)
-            rPrice = showPricesInput ? " (" + str.tostring(priceR, format.mintick) + ")" : ""
-            rLabel = showLabelsInput ? rName + rPrice : str.tostring(ratio) + rPrice
-            lbR = label.new(labelTime, priceR, rLabel, xloc=xloc.bar_time, style=labelStyle, color=#00000000, textcolor=col, size=size.small)
-            array.push(labels_arr, lbR)
-            
-            sName = "S" + str.tostring(levelNum) + " PP " + str.tostring(ratio)
-            sPrice = showPricesInput ? " (" + str.tostring(priceS, format.mintick) + ")" : ""
-            sLabel = showLabelsInput ? sName + sPrice : str.tostring(ratio) + sPrice
-            lbS = label.new(labelTime, priceS, sLabel, xloc=xloc.bar_time, style=labelStyle, color=#00000000, textcolor=col, size=size.small)
-            array.push(labels_arr, lbS)
+// Function to calculate level price
+calcR(ratio) => pivot + range_hl * ratio
+calcS(ratio) => pivot - range_hl * ratio
+
+// Plot all levels - Resistance
+plot(l1_show ? calcR(l1_ratio) : na, "R1", l1_color, l1_style == "Solid" ? 2 : 1, l1_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l2_show ? calcR(l2_ratio) : na, "R2", l2_color, l2_style == "Solid" ? 2 : 1, l2_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l3_show ? calcR(l3_ratio) : na, "R3", l3_color, l3_style == "Solid" ? 2 : 1, l3_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l4_show ? calcR(l4_ratio) : na, "R4", l4_color, l4_style == "Solid" ? 2 : 1, l4_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l5_show ? calcR(l5_ratio) : na, "R5", l5_color, l5_style == "Solid" ? 2 : 1, l5_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l6_show ? calcR(l6_ratio) : na, "R6", l6_color, l6_style == "Solid" ? 2 : 1, l6_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l7_show ? calcR(l7_ratio) : na, "R7", l7_color, l7_style == "Solid" ? 2 : 1, l7_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l8_show ? calcR(l8_ratio) : na, "R8", l8_color, l8_style == "Solid" ? 2 : 1, l8_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l9_show ? calcR(l9_ratio) : na, "R9", l9_color, l9_style == "Solid" ? 2 : 1, l9_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l10_show ? calcR(l10_ratio) : na, "R10", l10_color, l10_style == "Solid" ? 2 : 1, l10_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l11_show ? calcR(l11_ratio) : na, "R11", l11_color, l11_style == "Solid" ? 2 : 1, l11_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l12_show ? calcR(l12_ratio) : na, "R12", l12_color, l12_style == "Solid" ? 2 : 1, l12_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l13_show ? calcR(l13_ratio) : na, "R13", l13_color, l13_style == "Solid" ? 2 : 1, l13_style == "Solid" ? plot.style_line : plot.style_linebr)
+
+// Plot all levels - Support
+plot(l1_show ? calcS(l1_ratio) : na, "S1", l1_color, l1_style == "Solid" ? 2 : 1, l1_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l2_show ? calcS(l2_ratio) : na, "S2", l2_color, l2_style == "Solid" ? 2 : 1, l2_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l3_show ? calcS(l3_ratio) : na, "S3", l3_color, l3_style == "Solid" ? 2 : 1, l3_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l4_show ? calcS(l4_ratio) : na, "S4", l4_color, l4_style == "Solid" ? 2 : 1, l4_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l5_show ? calcS(l5_ratio) : na, "S5", l5_color, l5_style == "Solid" ? 2 : 1, l5_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l6_show ? calcS(l6_ratio) : na, "S6", l6_color, l6_style == "Solid" ? 2 : 1, l6_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l7_show ? calcS(l7_ratio) : na, "S7", l7_color, l7_style == "Solid" ? 2 : 1, l7_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l8_show ? calcS(l8_ratio) : na, "S8", l8_color, l8_style == "Solid" ? 2 : 1, l8_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l9_show ? calcS(l9_ratio) : na, "S9", l9_color, l9_style == "Solid" ? 2 : 1, l9_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l10_show ? calcS(l10_ratio) : na, "S10", l10_color, l10_style == "Solid" ? 2 : 1, l10_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l11_show ? calcS(l11_ratio) : na, "S11", l11_color, l11_style == "Solid" ? 2 : 1, l11_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l12_show ? calcS(l12_ratio) : na, "S12", l12_color, l12_style == "Solid" ? 2 : 1, l12_style == "Solid" ? plot.style_line : plot.style_linebr)
+plot(l13_show ? calcS(l13_ratio) : na, "S13", l13_color, l13_style == "Solid" ? 2 : 1, l13_style == "Solid" ? plot.style_line : plot.style_linebr)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// DRAW ALL 13 LEVELS
+// LABELS
 // ═══════════════════════════════════════════════════════════════════════════════
-drawPivotLevel(pp_show, pp_ratio, pp_color, pp_style, 0)
-drawPivotLevel(l1_show, l1_ratio, l1_color, l1_style, 1)
-drawPivotLevel(l2_show, l2_ratio, l2_color, l2_style, 2)
-drawPivotLevel(l3_show, l3_ratio, l3_color, l3_style, 3)
-drawPivotLevel(l4_show, l4_ratio, l4_color, l4_style, 4)
-drawPivotLevel(l5_show, l5_ratio, l5_color, l5_style, 5)
-drawPivotLevel(l6_show, l6_ratio, l6_color, l6_style, 6)
-drawPivotLevel(l7_show, l7_ratio, l7_color, l7_style, 7)
-drawPivotLevel(l8_show, l8_ratio, l8_color, l8_style, 8)
-drawPivotLevel(l9_show, l9_ratio, l9_color, l9_style, 9)
-drawPivotLevel(l10_show, l10_ratio, l10_color, l10_style, 10)
-drawPivotLevel(l11_show, l11_ratio, l11_color, l11_style, 11)
-drawPivotLevel(l12_show, l12_ratio, l12_color, l12_style, 12)
-drawPivotLevel(l13_show, l13_ratio, l13_color, l13_style, 13)
+if barstate.islast and (showLabelsInput or showPricesInput)
+    labelStyle = positionLabelsInput == "Left" ? label.style_label_right : label.style_label_left
+    xPos = positionLabelsInput == "Left" ? bar_index - 10 : bar_index + 10
+    
+    // Helper function for label text
+    getLabelText(name, ratio, price) =>
+        txt = showLabelsInput ? name + " " + str.tostring(ratio) : ""
+        txt += showPricesInput ? " (" + str.tostring(price, format.mintick) + ")" : ""
+        txt
+    
+    // PP Label
+    if pp_show
+        label.new(xPos, pivot, getLabelText("PP", 0, pivot), style=labelStyle, color=#00000000, textcolor=pp_color, size=size.small)
+    
+    // R/S Labels
+    if l1_show
+        label.new(xPos, calcR(l1_ratio), getLabelText("R1 PP", l1_ratio, calcR(l1_ratio)), style=labelStyle, color=#00000000, textcolor=l1_color, size=size.small)
+        label.new(xPos, calcS(l1_ratio), getLabelText("S1 PP", l1_ratio, calcS(l1_ratio)), style=labelStyle, color=#00000000, textcolor=l1_color, size=size.small)
+    if l2_show
+        label.new(xPos, calcR(l2_ratio), getLabelText("R2 PP", l2_ratio, calcR(l2_ratio)), style=labelStyle, color=#00000000, textcolor=l2_color, size=size.small)
+        label.new(xPos, calcS(l2_ratio), getLabelText("S2 PP", l2_ratio, calcS(l2_ratio)), style=labelStyle, color=#00000000, textcolor=l2_color, size=size.small)
+    if l3_show
+        label.new(xPos, calcR(l3_ratio), getLabelText("R3 PP", l3_ratio, calcR(l3_ratio)), style=labelStyle, color=#00000000, textcolor=l3_color, size=size.small)
+        label.new(xPos, calcS(l3_ratio), getLabelText("S3 PP", l3_ratio, calcS(l3_ratio)), style=labelStyle, color=#00000000, textcolor=l3_color, size=size.small)
+    if l4_show
+        label.new(xPos, calcR(l4_ratio), getLabelText("R4 PP", l4_ratio, calcR(l4_ratio)), style=labelStyle, color=#00000000, textcolor=l4_color, size=size.small)
+        label.new(xPos, calcS(l4_ratio), getLabelText("S4 PP", l4_ratio, calcS(l4_ratio)), style=labelStyle, color=#00000000, textcolor=l4_color, size=size.small)
+    if l5_show
+        label.new(xPos, calcR(l5_ratio), getLabelText("R5 PP", l5_ratio, calcR(l5_ratio)), style=labelStyle, color=#00000000, textcolor=l5_color, size=size.small)
+        label.new(xPos, calcS(l5_ratio), getLabelText("S5 PP", l5_ratio, calcS(l5_ratio)), style=labelStyle, color=#00000000, textcolor=l5_color, size=size.small)
+    if l6_show
+        label.new(xPos, calcR(l6_ratio), getLabelText("R6 PP", l6_ratio, calcR(l6_ratio)), style=labelStyle, color=#00000000, textcolor=l6_color, size=size.small)
+        label.new(xPos, calcS(l6_ratio), getLabelText("S6 PP", l6_ratio, calcS(l6_ratio)), style=labelStyle, color=#00000000, textcolor=l6_color, size=size.small)
+    if l7_show
+        label.new(xPos, calcR(l7_ratio), getLabelText("R7 PP", l7_ratio, calcR(l7_ratio)), style=labelStyle, color=#00000000, textcolor=l7_color, size=size.small)
+        label.new(xPos, calcS(l7_ratio), getLabelText("S7 PP", l7_ratio, calcS(l7_ratio)), style=labelStyle, color=#00000000, textcolor=l7_color, size=size.small)
+    if l8_show
+        label.new(xPos, calcR(l8_ratio), getLabelText("R8 PP", l8_ratio, calcR(l8_ratio)), style=labelStyle, color=#00000000, textcolor=l8_color, size=size.small)
+        label.new(xPos, calcS(l8_ratio), getLabelText("S8 PP", l8_ratio, calcS(l8_ratio)), style=labelStyle, color=#00000000, textcolor=l8_color, size=size.small)
+    if l9_show
+        label.new(xPos, calcR(l9_ratio), getLabelText("R9 PP", l9_ratio, calcR(l9_ratio)), style=labelStyle, color=#00000000, textcolor=l9_color, size=size.small)
+        label.new(xPos, calcS(l9_ratio), getLabelText("S9 PP", l9_ratio, calcS(l9_ratio)), style=labelStyle, color=#00000000, textcolor=l9_color, size=size.small)
+    if l10_show
+        label.new(xPos, calcR(l10_ratio), getLabelText("R10 PP", l10_ratio, calcR(l10_ratio)), style=labelStyle, color=#00000000, textcolor=l10_color, size=size.small)
+        label.new(xPos, calcS(l10_ratio), getLabelText("S10 PP", l10_ratio, calcS(l10_ratio)), style=labelStyle, color=#00000000, textcolor=l10_color, size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ALERTS
