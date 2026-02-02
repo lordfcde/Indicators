@@ -219,11 +219,11 @@ plot(ema233, "EMA 233", color=above_ema233 ? color.lime : color.red, linewidth=4
 // 7. CẢNH BÁO (CHỈ ICONS QUAN TRỌNG)
 // ==========================================
 
-// 🚦 VOLUME KIỆT SỨC - Volume thấp = Hết người bán = Tích cực
-plotshape(i_vSpikeLb and is_vol_exhaustion, "🚦 Vol Kiệt", shape.circle, location.belowbar, color.lime, text="🚦", size=size.tiny, force_overlay=true)
+// ⚡ VOLUME ĐỘT BIẾN - Volume cao bất thường = Có sự kiện lớn
+plotshape(i_hATRLb and is_vol_climax, "⚡ Vol Đột biến", shape.diamond, location.abovebar, color.yellow, text="⚡", size=size.tiny, force_overlay=true)
 
-// ⚡ BIẾN ĐỘNG MẠNH - Spread lớn bất thường  
-plotshape(i_hATRLb and is_high_volatility and not is_vol_exhaustion, "⚡ Biến động", shape.diamond, location.abovebar, color.yellow, text="⚡", size=size.tiny, force_overlay=true)
+// 🚦 VOLUME KIỆT - Volume thấp = Hết người bán = Tích cực  
+plotshape(i_vSpikeLb and is_vol_exhaustion, "🚦 Vol Kiệt", shape.circle, location.belowbar, color.lime, text="🚦", size=size.tiny, force_overlay=true)
 
 // ==========================================
 // 8. TÍN HIỆU MUA/BÁN
