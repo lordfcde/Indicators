@@ -182,24 +182,31 @@ if barstate.isfirst or barstate.islast
 // Draw new OB boxes
 if barstate.islast and i_showOB and array.size(bear_ob_top) > 0
     for i = 0 to math.min(4, array.size(bear_ob_top) - 1)  // Max 5 OBs
-        ob_top = array.get(bear_ob_top, i)
-        ob_btm = array.get(bear_ob_btm, i)
-        ob_avg = math.avg(ob_top, ob_btm)
+        ob_top_val = array.get(bear_ob_top, i)
+        ob_btm_val = array.get(bear_ob_btm, i)
+        ob_avg_val = math.avg(ob_top_val, ob_btm_val)
         
-        // Draw box
-        new_box = box.new(bar_index - 50, ob_top, bar_index + 20, ob_btm, 
+        // Draw box on overlay using bar_time
+        left_time = time - 50 * timeframe.in_seconds() * 1000
+        right_time = time + 20 * timeframe.in_seconds() * 1000
+        
+        new_box = box.new(left_time, ob_top_val, right_time, ob_btm_val, 
+              xloc=xloc.bar_time,
               border_color=color.new(#ff1100, 60), 
               bgcolor=color.new(#ff1100, 85),
               border_width=1,
-              extend=extend.right)
+              extend=extend.right,
+              force_overlay=true)
         array.push(ob_boxes, new_box)
         
-        // Draw label
-        new_label = label.new(bar_index + 25, ob_avg, "OB", 
+        // Draw label on overlay
+        new_label = label.new(right_time, ob_avg_val, "OB", 
+              xloc=xloc.bar_time,
               style=label.style_label_left,
               color=color.new(#ff1100, 70),
               textcolor=color.white,
-              size=size.small)
+              size=size.small,
+              force_overlay=true)
         array.push(ob_labels, new_label)
 
 // ==========================================
