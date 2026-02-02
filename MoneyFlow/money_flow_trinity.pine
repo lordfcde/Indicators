@@ -85,6 +85,22 @@ is_confirmed_uptrend = candles_above_ema233 >= trend_confirm_count
 is_confirmed_downtrend = candles_below_ema233 >= trend_confirm_count
 is_waiting_signal = not is_confirmed_uptrend and not is_confirmed_downtrend
 
+// Đếm số lần đảo chiều tín hiệu trong 10 nến gần đây (phát hiện thị trường choppy)
+signal_lookback = 10
+max_flip_allowed = 3  // Nếu đảo chiều > 3 lần trong 10 nến = choppy
+
+// Đếm số lần giá cross EMA233 trong lookback period
+var int flip_count = 0
+ema_cross = ta.cross(close, ema233)
+flip_count := math.round(math.sum(ema_cross ? 1 : 0, signal_lookback))
+
+// Đếm số lần dòng tiền đổi chiều
+mf_cross = ta.cross(mf, 0)
+mf_flip_count = math.round(math.sum(mf_cross ? 1 : 0, signal_lookback))
+
+// Thị trường choppy nếu có quá nhiều lần đảo chiều
+is_choppy_market = flip_count > max_flip_allowed or mf_flip_count > max_flip_allowed
+
 // --- RSI ---
 rsi_val = ta.rsi(close, rsi_len)
 rsi_overbought = rsi_val > rsi_ob
@@ -430,7 +446,11 @@ if barstate.islast
     rec_text = ""
     rec_bg = color.gray
     
-    if mf > 0.1 and is_confirmed_uptrend
+    // Kiểm tra thị trường choppy trước
+    if is_choppy_market
+        rec_text := "QUAN SÁT 🔄"
+        rec_bg := color.gray
+    else if mf > 0.1 and is_confirmed_uptrend
         rec_text := "MUA MẠNH 💪"
         rec_bg := color.lime
     else if mf > 0 and mf <= 0.1 and above_ema233
