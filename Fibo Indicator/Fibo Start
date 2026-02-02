@@ -1,7 +1,7 @@
 //@version=6
 // ═══════════════════════════════════════════════════════════════════════════════
 // Fibonacci Pivot Points - Custom Levels
-// Features: S3-S1 / PP / R1-R3 with Fibonacci ratios and prices
+// Features: S3-S1 / PP / R1-R3 with Fibonacci ratios, prices, line styles
 // ═══════════════════════════════════════════════════════════════════════════════
 indicator("Fibonacci Pivot Points", "FIB PP", overlay=true, max_lines_count=500, max_labels_count=500)
 
@@ -16,62 +16,75 @@ positionLabelsInput = input.string("Right", "Labels Position", options=["Left", 
 maxHistoricalPivots = input.int(title="Number of Pivots Back", defval=5, minval=1, maxval=50, group=group_main)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// FIBONACCI LEVELS - S3, S2, S1, PP, R1, R2, R3 with ratios
+// FIBONACCI LEVELS - S3, S2, S1, PP, R1, R2, R3 with ratios + LINE STYLE
 // ═══════════════════════════════════════════════════════════════════════════════
-group_levels = "📊 Fibonacci Pivot Levels"
+group_levels = "📊 Fibonacci Levels"
 
 // PP - Pivot Point (ratio = 0)
 pp_show = input.bool(true, "PP", inline="pp", group=group_levels)
 pp_ratio = input.float(0.0, "", inline="pp", group=group_levels)
-pp_color = input.color(#E91E63, "", inline="pp", group=group_levels)
+pp_color = input.color(#FF1493, "", inline="pp", group=group_levels)
+pp_style = input.string("Solid", "", options=["Solid", "Dashed", "Dotted"], inline="pp", group=group_levels)
 
-// R1/S1 - 0.382
-r1s1_show = input.bool(true, "R1/S1 PP", inline="r1s1", group=group_levels)
-r1s1_ratio = input.float(0.382, "", inline="r1s1", group=group_levels)
-r1s1_color = input.color(#81C784, "", inline="r1s1", group=group_levels)
+// Level 1 - 0.236
+l1_show = input.bool(true, "Level 1", inline="l1", group=group_levels)
+l1_ratio = input.float(0.236, "", inline="l1", group=group_levels)
+l1_color = input.color(#9C27B0, "", inline="l1", group=group_levels)
+l1_style = input.string("Dashed", "", options=["Solid", "Dashed", "Dotted"], inline="l1", group=group_levels)
 
-// R2/S2 - 0.618 (Golden Ratio - Important)
-r2s2_show = input.bool(true, "R2/S2 PP ★", inline="r2s2", group=group_levels)
-r2s2_ratio = input.float(0.618, "", inline="r2s2", group=group_levels)
-r2s2_color = input.color(#009688, "", inline="r2s2", group=group_levels)
+// Level 2 - 0.382 (Important - S1/R1)
+l2_show = input.bool(true, "R1/S1 ★", inline="l2", group=group_levels)
+l2_ratio = input.float(0.382, "", inline="l2", group=group_levels)
+l2_color = input.color(#4CAF50, "", inline="l2", group=group_levels)
+l2_style = input.string("Solid", "", options=["Solid", "Dashed", "Dotted"], inline="l2", group=group_levels)
 
-// R3/S3 - 1.0 (Important)
-r3s3_show = input.bool(true, "R3/S3 PP ★", inline="r3s3", group=group_levels)
-r3s3_ratio = input.float(1.0, "", inline="r3s3", group=group_levels)
-r3s3_color = input.color(#2196F3, "", inline="r3s3", group=group_levels)
+// Level 3 - 0.5
+l3_show = input.bool(true, "Level 3", inline="l3", group=group_levels)
+l3_ratio = input.float(0.5, "", inline="l3", group=group_levels)
+l3_color = input.color(#8BC34A, "", inline="l3", group=group_levels)
+l3_style = input.string("Dashed", "", options=["Solid", "Dashed", "Dotted"], inline="l3", group=group_levels)
 
-// Additional Fibonacci Levels
-group_ext = "📈 Extended Fibonacci Levels"
+// Level 4 - 0.618 (Important - S2/R2 Golden Ratio)
+l4_show = input.bool(true, "R2/S2 ★", inline="l4", group=group_levels)
+l4_ratio = input.float(0.618, "", inline="l4", group=group_levels)
+l4_color = input.color(#00BCD4, "", inline="l4", group=group_levels)
+l4_style = input.string("Solid", "", options=["Solid", "Dashed", "Dotted"], inline="l4", group=group_levels)
 
-// PP 0.236
-pp236_show = input.bool(true, "PP 0.236", inline="pp236", group=group_ext)
-pp236_ratio = input.float(0.236, "", inline="pp236", group=group_ext)
-pp236_color = input.color(#9C27B0, "", inline="pp236", group=group_ext)
+// Level 5 - 0.786
+l5_show = input.bool(true, "Level 5", inline="l5", group=group_levels)
+l5_ratio = input.float(0.786, "", inline="l5", group=group_levels)
+l5_color = input.color(#03A9F4, "", inline="l5", group=group_levels)
+l5_style = input.string("Dashed", "", options=["Solid", "Dashed", "Dotted"], inline="l5", group=group_levels)
 
-// PP 0.5
-pp5_show = input.bool(true, "PP 0.5", inline="pp5", group=group_ext)
-pp5_ratio = input.float(0.5, "", inline="pp5", group=group_ext)
-pp5_color = input.color(#4CAF50, "", inline="pp5", group=group_ext)
+// Level 6 - 1.0 (Important - S3/R3)
+l6_show = input.bool(true, "R3/S3 ★", inline="l6", group=group_levels)
+l6_ratio = input.float(1.0, "", inline="l6", group=group_levels)
+l6_color = input.color(#2196F3, "", inline="l6", group=group_levels)
+l6_style = input.string("Solid", "", options=["Solid", "Dashed", "Dotted"], inline="l6", group=group_levels)
 
-// PP 0.786
-pp786_show = input.bool(true, "PP 0.786", inline="pp786", group=group_ext)
-pp786_ratio = input.float(0.786, "", inline="pp786", group=group_ext)
-pp786_color = input.color(#00BCD4, "", inline="pp786", group=group_ext)
+// Level 7 - 1.272
+l7_show = input.bool(true, "Level 7", inline="l7", group=group_levels)
+l7_ratio = input.float(1.272, "", inline="l7", group=group_levels)
+l7_color = input.color(#3F51B5, "", inline="l7", group=group_levels)
+l7_style = input.string("Dashed", "", options=["Solid", "Dashed", "Dotted"], inline="l7", group=group_levels)
 
-// PP 1.272
-pp1272_show = input.bool(true, "PP 1.272", inline="pp1272", group=group_ext)
-pp1272_ratio = input.float(1.272, "", inline="pp1272", group=group_ext)
-pp1272_color = input.color(#3F51B5, "", inline="pp1272", group=group_ext)
+// Level 8 - 1.618 (Important - Golden Extension)
+l8_show = input.bool(true, "Level 8 ★", inline="l8", group=group_levels)
+l8_ratio = input.float(1.618, "", inline="l8", group=group_levels)
+l8_color = input.color(#673AB7, "", inline="l8", group=group_levels)
+l8_style = input.string("Solid", "", options=["Solid", "Dashed", "Dotted"], inline="l8", group=group_levels)
 
-// PP 1.618 (Golden Extension - Important)
-pp1618_show = input.bool(true, "PP 1.618 ★", inline="pp1618", group=group_ext)
-pp1618_ratio = input.float(1.618, "", inline="pp1618", group=group_ext)
-pp1618_color = input.color(#673AB7, "", inline="pp1618", group=group_ext)
+// Level 9 - 2.0
+l9_show = input.bool(true, "Level 9", inline="l9", group=group_levels)
+l9_ratio = input.float(2.0, "", inline="l9", group=group_levels)
+l9_color = input.color(#9C27B0, "", inline="l9", group=group_levels)
+l9_style = input.string("Dashed", "", options=["Solid", "Dashed", "Dotted"], inline="l9", group=group_levels)
 
-// PP 2.618
-pp2618_show = input.bool(false, "PP 2.618", inline="pp2618", group=group_ext)
-pp2618_ratio = input.float(2.618, "", inline="pp2618", group=group_ext)
-pp2618_color = input.color(#E91E63, "", inline="pp2618", group=group_ext)
+// Level 10 - 2.618
+l10_show = input.bool(true, "Level 10", inline="l10", group=group_levels)
+l10_ratio = input.float(2.618, "", inline="l10", group=group_levels)
+l10_color = input.color(#E91E63, "", inline="l10", group=group_levels)
+l10_style = input.string("Dashed", "", options=["Solid", "Dashed", "Dotted"], inline="l10", group=group_levels)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // AUTO TIMEFRAME
@@ -121,8 +134,9 @@ f_htf_ohlc(_htf) =>
 pivot = (htf_h + htf_l + htf_c) / 3
 range_hl = htf_h - htf_l
 
-// Important ratios (solid lines): 0, 0.382, 0.618, 1.0, 1.618
-isImportant(ratio) => ratio == 0.0 or ratio == 0.382 or ratio == 0.618 or ratio == 1.0 or ratio == 1.618
+// Convert style string to line style
+getLineStyle(styleStr) =>
+    styleStr == "Solid" ? line.style_solid : styleStr == "Dashed" ? line.style_dashed : line.style_dotted
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DRAWING ARRAYS
@@ -140,15 +154,15 @@ if barstate.islast
 // ═══════════════════════════════════════════════════════════════════════════════
 // DRAW FUNCTION
 // ═══════════════════════════════════════════════════════════════════════════════
-drawPivotLevel(show, ratio, col, levelName) =>
+drawPivotLevel(show, ratio, col, styleStr, levelNum) =>
     if show and not na(pivot) and not na(range_hl) and barstate.islast
         // Calculate Resistance price
         priceR = pivot + range_hl * ratio
         // Calculate Support price  
         priceS = pivot - range_hl * ratio
         
-        lineStyle = isImportant(ratio) ? line.style_solid : line.style_dashed
-        lineWidth = isImportant(ratio) ? 2 : 1
+        lineStyle = getLineStyle(styleStr)
+        lineWidth = styleStr == "Solid" ? 2 : 1
         
         // Time coordinates
         time_start = ta.valuewhen(timeframe.change(pivotTimeframe), time, 0)
@@ -175,34 +189,34 @@ drawPivotLevel(show, ratio, col, levelName) =>
             lnS = line.new(time_start, priceS, time_end, priceS, xloc=xloc.bar_time, color=col, width=lineWidth, style=lineStyle)
             array.push(lines_arr, lnS)
             
-            // Label for Resistance: "R3 PP 1.0 (31950)"
-            rLabel = showLabelsInput ? levelName + " " + str.tostring(ratio) : str.tostring(ratio)
+            // Label for Resistance: "R1 PP 0.382 (28150)"
+            rName = "R" + str.tostring(levelNum) + " PP " + str.tostring(ratio)
             rPrice = showPricesInput ? " (" + str.tostring(priceR, format.mintick) + ")" : ""
-            lbR = label.new(labelTime, priceR, rLabel + rPrice, xloc=xloc.bar_time, style=labelStyle, color=#00000000, textcolor=col, size=size.small)
+            rLabel = showLabelsInput ? rName + rPrice : str.tostring(ratio) + rPrice
+            lbR = label.new(labelTime, priceR, rLabel, xloc=xloc.bar_time, style=labelStyle, color=#00000000, textcolor=col, size=size.small)
             array.push(labels_arr, lbR)
             
-            // Label for Support: "S3 PP 1.0 (22200)"
-            sLabel = showLabelsInput ? str.replace(levelName, "R", "S") + " " + str.tostring(ratio) : str.tostring(ratio)
+            // Label for Support: "S1 PP 0.382 (24850)"
+            sName = "S" + str.tostring(levelNum) + " PP " + str.tostring(ratio)
             sPrice = showPricesInput ? " (" + str.tostring(priceS, format.mintick) + ")" : ""
-            lbS = label.new(labelTime, priceS, sLabel + sPrice, xloc=xloc.bar_time, style=labelStyle, color=#00000000, textcolor=col, size=size.small)
+            sLabel = showLabelsInput ? sName + sPrice : str.tostring(ratio) + sPrice
+            lbS = label.new(labelTime, priceS, sLabel, xloc=xloc.bar_time, style=labelStyle, color=#00000000, textcolor=col, size=size.small)
             array.push(labels_arr, lbS)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DRAW ALL LEVELS
 // ═══════════════════════════════════════════════════════════════════════════════
-// Standard Pivot Points
-drawPivotLevel(pp_show, pp_ratio, pp_color, "PP")
-drawPivotLevel(r1s1_show, r1s1_ratio, r1s1_color, "R1 PP")
-drawPivotLevel(r2s2_show, r2s2_ratio, r2s2_color, "R2 PP")
-drawPivotLevel(r3s3_show, r3s3_ratio, r3s3_color, "R3 PP")
-
-// Extended Fibonacci Levels
-drawPivotLevel(pp236_show, pp236_ratio, pp236_color, "R PP")
-drawPivotLevel(pp5_show, pp5_ratio, pp5_color, "R PP")
-drawPivotLevel(pp786_show, pp786_ratio, pp786_color, "R PP")
-drawPivotLevel(pp1272_show, pp1272_ratio, pp1272_color, "R PP")
-drawPivotLevel(pp1618_show, pp1618_ratio, pp1618_color, "R PP")
-drawPivotLevel(pp2618_show, pp2618_ratio, pp2618_color, "R PP")
+drawPivotLevel(pp_show, pp_ratio, pp_color, pp_style, 0)
+drawPivotLevel(l1_show, l1_ratio, l1_color, l1_style, 1)
+drawPivotLevel(l2_show, l2_ratio, l2_color, l2_style, 1)
+drawPivotLevel(l3_show, l3_ratio, l3_color, l3_style, 2)
+drawPivotLevel(l4_show, l4_ratio, l4_color, l4_style, 2)
+drawPivotLevel(l5_show, l5_ratio, l5_color, l5_style, 3)
+drawPivotLevel(l6_show, l6_ratio, l6_color, l6_style, 3)
+drawPivotLevel(l7_show, l7_ratio, l7_color, l7_style, 4)
+drawPivotLevel(l8_show, l8_ratio, l8_color, l8_style, 4)
+drawPivotLevel(l9_show, l9_ratio, l9_color, l9_style, 5)
+drawPivotLevel(l10_show, l10_ratio, l10_color, l10_style, 5)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ALERTS
