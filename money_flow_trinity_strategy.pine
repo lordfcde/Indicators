@@ -30,7 +30,7 @@ trail_pct = input.float(5.0, "Trailing Stop %", group=grp_risk)
 
 grp_addon = "6. Cảnh Báo Đặc Biệt"
 i_vSpikeLb = input.bool(true, "Hiện 🚦 (Vol Kiệt sức)", group=grp_addon)
-i_vSpikeTh = input.float(4.669, "Ngưỡng Vol Kiệt sức (x TB)", group=grp_addon)
+i_vSpikeTh = input.float(0.3, "Ngưỡng Vol Kiệt sức (x TB)", group=grp_addon)
 i_hATRLb = input.bool(true, "Hiện ⚡ (Biến động lỏng lẻo)", group=grp_addon)
 i_atr_mult = input.float(2.718, "Ngưỡng Biến động (x ATR)", group=grp_addon)
 
@@ -81,7 +81,7 @@ is_bearish = close < open
 close_position = (close - low) / (high - low)
 
 // Volume Kiệt sức & Biến động lỏng lẻo
-is_vol_exhaustion = vol_ratio >= i_vSpikeTh  // 🚦
+is_vol_exhaustion = vol_ratio <= i_vSpikeTh  // 🚦 Volume thấp = Cạn kiệt
 is_high_volatility = spread > atr_val * i_atr_mult  // ⚡
 is_volatility_surge = is_vol_exhaustion or is_high_volatility
 
@@ -213,7 +213,7 @@ plot(ema144, "EMA 144", color=above_ema144 ? color.lime : color.red, linewidth=3
 plot(ema233, "EMA 233", color=above_ema233 ? color.lime : color.red, linewidth=4)
 
 // VSA Icons - 🚦 và ⚡
-plotshape(i_vSpikeLb and is_vol_exhaustion, "🚦 Vol Kiệt sức", shape.circle, location.abovebar, color.red, text="🚦", size=size.small)
+plotshape(i_vSpikeLb and is_vol_exhaustion, "🚦 Vol Kiệt sức", shape.circle, location.belowbar, color.lime, text="🚦", size=size.small)
 plotshape(i_hATRLb and is_high_volatility, "⚡ Biến động", shape.diamond, location.abovebar, color.yellow, text="⚡", size=size.small)
 plotshape(is_spring or is_shakeout, "Spring", shape.diamond, location.belowbar, color.aqua, size=size.small)
 plotshape(accumulation_sign, "Accum", shape.triangleup, location.belowbar, color.lime, size=size.tiny)

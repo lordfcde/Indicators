@@ -36,7 +36,7 @@ buy_cooldown = input.int(3, "Cooldown MUA", minval=1, group=grp_cooldown)
 
 grp_addon = "7. Cảnh Báo Đặc Biệt"
 i_vSpikeLb = input.bool(true, "Hiện 🚦 (Vol Kiệt sức)", group=grp_addon)
-i_vSpikeTh = input.float(4.669, "Ngưỡng Vol Kiệt sức (x TB)", group=grp_addon, tooltip="Volume > X lần TB = Kiệt sức")
+i_vSpikeTh = input.float(0.3, "Ngưỡng Vol Kiệt sức (x TB)", group=grp_addon, tooltip="Volume < X lần TB = Cạn kiệt, hết người bán")
 i_hATRLb = input.bool(true, "Hiện ⚡ (Biến động lỏng lẻo)", group=grp_addon)
 i_atr_mult = input.float(2.718, "Ngưỡng Biến động (x ATR)", group=grp_addon, tooltip="Spread > X lần ATR = Biến động mạnh")
 
@@ -87,8 +87,8 @@ is_vol_high = vol_ratio >= 1.5 and vol_ratio < vol_climax_mult
 is_vol_normal = vol_ratio >= 0.8 and vol_ratio < 1.5
 is_vol_dry = vol_ratio < vol_dry_mult
 
-// --- Volume Kiệt sức (Exhaustion) ---
-is_vol_exhaustion = vol_ratio >= i_vSpikeTh  // 🚦 Volume cực đại
+// --- Volume Kiệt sức (Cạn kiệt - Hết người bán) ---
+is_vol_exhaustion = vol_ratio <= i_vSpikeTh  // 🚦 Volume thấp = Cạn kiệt
 
 // --- Spread Analysis ---
 atr_val = ta.atr(14)
@@ -220,8 +220,8 @@ plot(ema233, "EMA 233", color=above_ema233 ? color.lime : color.red, linewidth=4
 // 7. CẢNH BÁO (CHỈ ICONS QUAN TRỌNG)
 // ==========================================
 
-// 🚦 VOLUME KIỆT SỨC - Volume cực cao, có thể đỉnh/đáy
-plotshape(i_vSpikeLb and is_vol_exhaustion, "🚦 Vol Kiệt", shape.circle, location.abovebar, color.red, text="🚦", size=size.tiny, force_overlay=true)
+// 🚦 VOLUME KIỆT SỨC - Volume thấp = Hết người bán = Tích cực
+plotshape(i_vSpikeLb and is_vol_exhaustion, "🚦 Vol Kiệt", shape.circle, location.belowbar, color.lime, text="🚦", size=size.tiny, force_overlay=true)
 
 // ⚡ BIẾN ĐỘNG MẠNH - Spread lớn bất thường  
 plotshape(i_hATRLb and is_high_volatility and not is_vol_exhaustion, "⚡ Biến động", shape.diamond, location.abovebar, color.yellow, text="⚡", size=size.tiny, force_overlay=true)
