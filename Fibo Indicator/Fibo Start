@@ -113,7 +113,8 @@ autoAnchor = switch
     timeframe.isintraday and timeframe.multiplier <= 15 => "1D"
     timeframe.isintraday and timeframe.multiplier <= 240 => "1W"
     timeframe.isdaily => "1M"
-    timeframe.isweekly or timeframe.ismonthly => "12M"
+    timeframe.isweekly => "3M"
+    timeframe.ismonthly => "12M"
     => "1M"
 
 pivotTimeframe = switch pivotAnchorInput
