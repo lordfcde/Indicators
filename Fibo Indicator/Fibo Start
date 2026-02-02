@@ -1,4 +1,4 @@
-//@version=6
+//@version=5
 // ══════════════════════════════════════════════════════════════════════════════════════════════════ //
 //# * ══════════════════════════════════════════════════════════════════════════════════════════════
 //# *
@@ -19,7 +19,7 @@
 
 indicator('Fibonacci Extention / Retracment / Pivot Points by DGT', 'FIBs · ☼☾', true, max_lines_count = 500, max_labels_count = 500)
 
-display = display.all - display.status_line
+// Pine v5 compatible
 
 group_pick = 'Pick a Fibonacci Tool'
 
@@ -33,7 +33,7 @@ tooltip_fib_tool =
  'Use combinations to identify high-probability confluence zones.'
 
 i_isFib = input.bool(true, 'Pick a Fibonacci Tool', inline = 'FIB', group = group_pick, tooltip = tooltip_fib_tool)
-i_fibTool = input.string('Pivot Points', '             ', options = ['Pivot Points', 'Retracements', 'Retracements + Pivot Points', 'Extensions', 'Extensions + Pivot Points'], inline = 'FIB', group = group_pick, display = display)
+i_fibTool = input.string('Pivot Points', '             ', options = ['Pivot Points', 'Retracements', 'Retracements + Pivot Points', 'Extensions', 'Extensions + Pivot Points'], inline = 'FIB', group = group_pick)
 
 tooltip_fib_tz =
  'Displays Fibonacci Time Zones\n\n' +
@@ -50,8 +50,8 @@ tooltip_threshold =
  'Depth:\n' +
  'Defines the minimum number of bars required to confirm a swing high or low. Higher values produce smoother structure but react more slowly.'
 
-i_dev_thresh = ta.atr(10) / close * 100 * input.float(3, 'Deviation', minval = 0, inline = 'Pivots', group = groupSwing, tooltip = tooltip_threshold, display = display)
-i_depth = input.int(11, '       Depth', minval = 1, inline = 'Pivots', group = groupSwing, display = display)
+i_dev_thresh = ta.atr(10) / close * 100 * input.float(3, 'Deviation', minval = 0, inline = 'Pivots', group = groupSwing, tooltip = tooltip_threshold)
+i_depth = input.int(11, '       Depth', minval = 1, inline = 'Pivots', group = groupSwing)
 
 
 group_pivot = 'Fibonacci Pivot Points Settings'
@@ -76,37 +76,37 @@ tooltip_htf =
 
  'Auto mode is designed to provide context-aware pivot levels without manual adjustment.'
 
-htf_tf = input.string('Auto', 'Pivot Points Timeframe', options = ['Auto', '15 Min', '1 Hour', '4 Hour', 'Daily', 'Weekly', 'Monthly', 'Quarterly', 'Yearly'],  group = group_pivot, tooltip = tooltip_htf, display = display)
+htf_tf = input.string('Auto', 'Pivot Points Timeframe', options = ['Auto', '15 Min', '1 Hour', '4 Hour', 'Daily', 'Weekly', 'Monthly', 'Quarterly', 'Yearly'],  group = group_pivot, tooltip = tooltip_htf)
 
-i_levelsPvt = input.string('Levels', 'Level Labels', options = ['Levels', 'Prices', 'Levels + Prices', 'None'], inline = 'pvt', group = group_pivot, display = display)
-i_levelsPvtP = input.string('Pivot End', '', options = ['Last Bar', 'Pivot End'], inline = 'pvt', group = group_pivot, display = display)
-i_levelsPvtS = input.string('Small', '', options = ['Small', 'Normal'], inline = 'pvt', group = group_pivot, display = display)
+i_levelsPvt = input.string('Levels', 'Level Labels', options = ['Levels', 'Prices', 'Levels + Prices', 'None'], inline = 'pvt', group = group_pivot)
+i_levelsPvtP = input.string('Pivot End', '', options = ['Last Bar', 'Pivot End'], inline = 'pvt', group = group_pivot)
+i_levelsPvtS = input.string('Small', '', options = ['Small', 'Normal'], inline = 'pvt', group = group_pivot)
 
 i_relevant = input.bool(false, 'Only Relevant Pivot Point Levels', group = group_pivot)
 i_histPP = input.bool(false, 'Historical Pivot Points', group = group_pivot)
 i_extend = input.bool(false, 'Extend Pivot Point Lines', inline = 'fLines', group = group_pivot)
-i_extendL = input.string('Dashed', '', options = ['Dashed', 'Dotted', 'Solid'], inline = 'fLines', group = group_pivot, display = display)
+i_extendL = input.string('Dashed', '', options = ['Dashed', 'Dotted', 'Solid'], inline = 'fLines', group = group_pivot)
 
 
 group_fib_tool = 'Fibonacci Extension / Retracement Settings'
 
-i_levels = input.string('Levels', 'Level Labels', options = ['Levels', 'Prices', 'Levels + Prices', 'None'], inline = 'fLines', group = group_fib_tool, display = display)
-i_levelsP = input.string('Pivot Start', '', options = ['Last Bar', 'Pivot Start'], inline = 'fLines', group = group_fib_tool, display = display)
-i_levelsS = input.string('Small', '', options = ['Small', 'Normal'], inline = 'fLines', group = group_fib_tool, display = display)
+i_levels = input.string('Levels', 'Level Labels', options = ['Levels', 'Prices', 'Levels + Prices', 'None'], inline = 'fLines', group = group_fib_tool)
+i_levelsP = input.string('Pivot Start', '', options = ['Last Bar', 'Pivot Start'], inline = 'fLines', group = group_fib_tool)
+i_levelsS = input.string('Small', '', options = ['Small', 'Normal'], inline = 'fLines', group = group_fib_tool)
 
 i_reverse = input.bool(false, 'Reverse Extension / Retracement Levels', group = group_fib_tool)
 i_extendER = input.bool(false, 'Extend Extension / Retracement Lines', inline = 'fLine', group = group_fib_tool)
-i_histPivot = input.int(0, 'Historical Extension / Retracement Levels', minval = 0, group = group_fib_tool, display = display)
+i_histPivot = input.int(0, 'Historical Extension / Retracement Levels', minval = 0, group = group_fib_tool)
 
 
 group_fib_tz = 'Fibonacci TimeZone Settings'
 
 i_fib_tzl = input.bool(true, 'Time Zone Labels', inline = 'tz poz', group = group_fib_tz)
-i_fib_tzlp = input.string('Left', '', options = ['Right', 'Left'], inline = 'tz poz', group = group_fib_tz, display = display)
+i_fib_tzlp = input.string('Left', '', options = ['Right', 'Left'], inline = 'tz poz', group = group_fib_tz)
 fib_tzlp = i_fib_tzlp == 'Left' ? label.style_label_left : label.style_label_right
-i_fib_tzlp2 = input.string('Bottom', '', options = ['Bottom', 'Top'], inline = 'tz poz', group = group_fib_tz, display = display)
+i_fib_tzlp2 = input.string('Bottom', '', options = ['Bottom', 'Top'], inline = 'tz poz', group = group_fib_tz)
 i_tzColor = input.color(#2196f3, 'Time Zone Line Color', group = group_fib_tz)
-i_histPivot2 = input.int(0, 'Historical Time Zones', minval = 0, group = group_fib_tz, display = display)
+i_histPivot2 = input.int(0, 'Historical Time Zones', minval = 0, group = group_fib_tz)
 
 
 group_zigzag = 'ZigZag Settings'
@@ -117,8 +117,8 @@ tooltip_zigzag =
 
 i_zigZag = input.bool(false, 'Zig Zag', inline = 'ZZ', group = group_zigzag, tooltip = tooltip_zigzag)
 i_zzColor = input.color(#c77a08, '', inline = 'ZZ', group = group_zigzag)
-i_zzStyle = input.string('Solid', '', options = ['Dashed', 'Dotted', 'Solid'], inline = 'ZZ', group = group_zigzag, display = display)
-i_zzWidth = input.int(1, '', minval = 1, inline = 'ZZ', group = group_zigzag, display = display)
+i_zzStyle = input.string('Solid', '', options = ['Dashed', 'Dotted', 'Solid'], inline = 'ZZ', group = group_zigzag)
+i_zzWidth = input.int(1, '', minval = 1, inline = 'ZZ', group = group_zigzag)
 
 tooltip_zz_swings =
  'ZigZag Swing Points\n\n' +
@@ -510,146 +510,146 @@ f_processLevelX(_show, _level, _color) =>
 group_fib_levels = 'Fibonacci Levels'
 
 show_0 = input.bool(true, '', inline = 'Level0', group = group_fib_levels)
-value_0 = input.float(0., '', inline = 'Level0', group = group_fib_levels, display = display)
+value_0 = input.float(0., '', inline = 'Level0', group = group_fib_levels)
 color_0 = input.color(#787b86, '', inline = 'Level0', group = group_fib_levels)
 f_processLevelX(show_0, value_0, color_0)
 
 show_0_236 = input.bool(true, '', inline = 'Level0', group = group_fib_levels)
-value_0_236 = input.float(0.236, '', inline = 'Level0', group = group_fib_levels, display = display)
+value_0_236 = input.float(0.236, '', inline = 'Level0', group = group_fib_levels)
 color_0_236 = input.color(#f44336, '', inline = 'Level0', group = group_fib_levels)
 f_processLevelX(show_0_236, value_0_236, color_0_236)
 
 show_0_382 = input.bool(true, '', inline = 'Level1', group = group_fib_levels)
-value_0_382 = input.float(0.382, '', inline = 'Level1', group = group_fib_levels, display = display)
+value_0_382 = input.float(0.382, '', inline = 'Level1', group = group_fib_levels)
 color_0_382 = input.color(#81c784, '', inline = 'Level1', group = group_fib_levels)
 f_processLevelX(show_0_382, value_0_382, color_0_382)
 
 show_0_5 = input.bool(true, '', inline = 'Level1', group = group_fib_levels)
-value_0_5 = input.float(0.5, '', inline = 'Level1', group = group_fib_levels, display = display)
+value_0_5 = input.float(0.5, '', inline = 'Level1', group = group_fib_levels)
 color_0_5 = input.color(#4caf50, '', inline = 'Level1', group = group_fib_levels)
 f_processLevelX(show_0_5, value_0_5, color_0_5)
 
 show_0_618 = input.bool(true, '', inline = 'Level2', group = group_fib_levels)
-value_0_618 = input.float(0.618, '', inline = 'Level2', group = group_fib_levels, display = display)
+value_0_618 = input.float(0.618, '', inline = 'Level2', group = group_fib_levels)
 color_0_618 = input.color(#009688, '', inline = 'Level2', group = group_fib_levels)
 f_processLevelX(show_0_618, value_0_618, color_0_618)
 
 show_0_65 = input.bool(false, '', inline = 'Level2', group = group_fib_levels)
-value_0_65 = input.float(0.65, '', inline = 'Level2', group = group_fib_levels, display = display)
+value_0_65 = input.float(0.65, '', inline = 'Level2', group = group_fib_levels)
 color_0_65 = input.color(#009688, '', inline = 'Level2', group = group_fib_levels)
 f_processLevelX(show_0_65, value_0_65, color_0_65)
 
 show_0_786 = input.bool(true, '', inline = 'Level3', group = group_fib_levels)
-value_0_786 = input.float(0.786, '', inline = 'Level3', group = group_fib_levels, display = display)
+value_0_786 = input.float(0.786, '', inline = 'Level3', group = group_fib_levels)
 color_0_786 = input.color(#64b5f6, '', inline = 'Level3', group = group_fib_levels)
 f_processLevelX(show_0_786, value_0_786, color_0_786)
 
 show_1 = input.bool(true, '', inline = 'Level3', group = group_fib_levels)
-value_1 = input.float(1., '', inline = 'Level3', group = group_fib_levels, display = display)
+value_1 = input.float(1., '', inline = 'Level3', group = group_fib_levels)
 color_1 = input.color(#787b86, '', inline = 'Level3', group = group_fib_levels)
 f_processLevelX(show_1, value_1, color_1)
 
 show_1_272 = input.bool(false, '', inline = 'Level4', group = group_fib_levels)
-value_1_272 = input.float(1.272, '', inline = 'Level4', group = group_fib_levels, display = display)
+value_1_272 = input.float(1.272, '', inline = 'Level4', group = group_fib_levels)
 color_1_272 = input.color(#81c784, '', inline = 'Level4', group = group_fib_levels)
 f_processLevelX(show_1_272, value_1_272, color_1_272)
 
 show_1_414 = input.bool(false, '', inline = 'Level4', group = group_fib_levels)
-value_1_414 = input.float(1.414, '', inline = 'Level4', group = group_fib_levels, display = display)
+value_1_414 = input.float(1.414, '', inline = 'Level4', group = group_fib_levels)
 color_1_414 = input.color(#f44336, '', inline = 'Level4', group = group_fib_levels)
 f_processLevelX(show_1_414, value_1_414, color_1_414)
 
 show_1_618 = input.bool(true, '', inline = 'Level5', group = group_fib_levels)
-value_1_618 = input.float(1.618, '', inline = 'Level5', group = group_fib_levels, display = display)
+value_1_618 = input.float(1.618, '', inline = 'Level5', group = group_fib_levels)
 color_1_618 = input.color(#2196f3, '', inline = 'Level5', group = group_fib_levels)
 f_processLevelX(show_1_618, value_1_618, color_1_618)
 
 show_1_65 = input.bool(false, '', inline = 'Level5', group = group_fib_levels)
-value_1_65 = input.float(1.65, '', inline = 'Level5', group = group_fib_levels, display = display)
+value_1_65 = input.float(1.65, '', inline = 'Level5', group = group_fib_levels)
 color_1_65 = input.color(#2196f3, '', inline = 'Level5', group = group_fib_levels)
 f_processLevelX(show_1_65, value_1_65, color_1_65)
 
 show_2_618 = input.bool(false, '', inline = 'Level6', group = group_fib_levels)
-value_2_618 = input.float(2.618, '', inline = 'Level6', group = group_fib_levels, display = display)
+value_2_618 = input.float(2.618, '', inline = 'Level6', group = group_fib_levels)
 color_2_618 = input.color(#f44336, '', inline = 'Level6', group = group_fib_levels)
 f_processLevelX(show_2_618, value_2_618, color_2_618)
 
 show_2_65 = input.bool(false, '', inline = 'Level6', group = group_fib_levels)
-value_2_65 = input.float(2.65, '', inline = 'Level6', group = group_fib_levels, display = display)
+value_2_65 = input.float(2.65, '', inline = 'Level6', group = group_fib_levels)
 color_2_65 = input.color(#f44336, '', inline = 'Level6', group = group_fib_levels)
 f_processLevelX(show_2_65, value_2_65, color_2_65)
 
 show_3_618 = input.bool(false, '', inline = 'Level7', group = group_fib_levels)
-value_3_618 = input.float(3.618, '', inline = 'Level7', group = group_fib_levels, display = display)
+value_3_618 = input.float(3.618, '', inline = 'Level7', group = group_fib_levels)
 color_3_618 = input.color(#9c27b0, '', inline = 'Level7', group = group_fib_levels)
 f_processLevelX(show_3_618, value_3_618, color_3_618)
 
 show_3_65 = input.bool(false, '', inline = 'Level7', group = group_fib_levels)
-value_3_65 = input.float(3.65, '', inline = 'Level7', group = group_fib_levels, display = display)
+value_3_65 = input.float(3.65, '', inline = 'Level7', group = group_fib_levels)
 color_3_65 = input.color(#9c27b0, '', inline = 'Level7', group = group_fib_levels)
 f_processLevelX(show_3_65, value_3_65, color_3_65)
 
 show_4_236 = input.bool(false, '', inline = 'Level8', group = group_fib_levels)
-value_4_236 = input.float(4.236, '', inline = 'Level8', group = group_fib_levels, display = display)
+value_4_236 = input.float(4.236, '', inline = 'Level8', group = group_fib_levels)
 color_4_236 = input.color(#e91e63, '', inline = 'Level8', group = group_fib_levels)
 f_processLevelX(show_4_236, value_4_236, color_4_236)
 
 show_4_618 = input.bool(false, '', inline = 'Level8', group = group_fib_levels)
-value_4_618 = input.float(4.618, '', inline = 'Level8', group = group_fib_levels, display = display)
+value_4_618 = input.float(4.618, '', inline = 'Level8', group = group_fib_levels)
 color_4_618 = input.color(#81c784, '', inline = 'Level8', group = group_fib_levels)
 f_processLevelX(show_4_618, value_4_618, color_4_618)
 
 show_neg_0_236 = input.bool(false, '', inline = 'Level9', group = group_fib_levels)
-value_neg_0_236 = input.float(-0.236, '', inline = 'Level9', group = group_fib_levels, display = display)
+value_neg_0_236 = input.float(-0.236, '', inline = 'Level9', group = group_fib_levels)
 color_neg_0_236 = input.color(#f44336, '', inline = 'Level9', group = group_fib_levels)
 f_processLevelX(show_neg_0_236, value_neg_0_236, color_neg_0_236)
 
 show_neg_0_382 = input.bool(false, '', inline = 'Level9', group = group_fib_levels)
-value_neg_0_382 = input.float(-0.382, '', inline = 'Level9', group = group_fib_levels, display = display)
+value_neg_0_382 = input.float(-0.382, '', inline = 'Level9', group = group_fib_levels)
 color_neg_0_382 = input.color(#81c784, '', inline = 'Level9', group = group_fib_levels)
 f_processLevelX(show_neg_0_382, value_neg_0_382, color_neg_0_382)
 
 show_neg_0_618 = input.bool(true, '', inline = 'Level10', group = group_fib_levels)
-value_neg_0_618 = input.float(-0.618, '', inline = 'Level10', group = group_fib_levels, display = display)
+value_neg_0_618 = input.float(-0.618, '', inline = 'Level10', group = group_fib_levels)
 color_neg_0_618 = input.color(#009688, '', inline = 'Level10', group = group_fib_levels)
 f_processLevelX(show_neg_0_618, value_neg_0_618, color_neg_0_618)
 
 show_neg_0_65 = input.bool(false, '', inline = 'Level10', group = group_fib_levels)
-value_neg_0_65 = input.float(-0.65, '', inline = 'Level10', group = group_fib_levels, display = display)
+value_neg_0_65 = input.float(-0.65, '', inline = 'Level10', group = group_fib_levels)
 color_neg_0_65 = input.color(#009688, '', inline = 'Level10', group = group_fib_levels)
 f_processLevelX(show_neg_0_65, value_neg_0_65, color_neg_0_65)
 
 i_histPP := i_histPP and (i_fibTool == 'Pivot Points' or i_fibTool == 'Extensions + Pivot Points' or i_fibTool == 'Retracements + Pivot Points')
 
-plot(i_histPP and show_0 ? math.avg(htf_h1, htf_l1, htf_c1) : na, 'PP', bool(ta.change(time(htf))) ? na : color_0, editable = false, display = display)
-plot(i_histPP and show_0_236 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_0_236 : na, 'PP 0_236', bool(ta.change(time(htf))) ? na : color_0_236, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_0_236 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_0_236 : na, 'PP 0_236', bool(ta.change(time(htf))) ? na : color_0_236, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_0_382 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_0_382 : na, 'PP 0_382', bool(ta.change(time(htf))) ? na : color_0_382, editable = false, display = display)
-plot(i_histPP and show_0_382 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_0_382 : na, 'PP 0_382', bool(ta.change(time(htf))) ? na : color_0_382, editable = false, display = display)
-plot(i_histPP and show_0_5 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_0_5 : na, 'PP 0_5  ', bool(ta.change(time(htf))) ? na : color_0_5, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_0_5 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_0_5 : na, 'PP 0_5  ', bool(ta.change(time(htf))) ? na : color_0_5, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_0_618 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_0_618 : na, 'PP 0_618', bool(ta.change(time(htf))) ? na : color_0_618, editable = false, display = display)
-plot(i_histPP and show_0_618 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_0_618 : na, 'PP 0_618', bool(ta.change(time(htf))) ? na : color_0_618, editable = false, display = display)
-plot(i_histPP and show_0_65 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_0_65 : na, 'PP 0_65 ', bool(ta.change(time(htf))) ? na : color_0_65, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_0_65 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_0_65 : na, 'PP 0_65 ', bool(ta.change(time(htf))) ? na : color_0_65, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_0_786 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_0_786 : na, 'PP 0_786', bool(ta.change(time(htf))) ? na : color_0_786, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_0_786 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_0_786 : na, 'PP 0_786', bool(ta.change(time(htf))) ? na : color_0_786, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_1 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_1 : na, 'PP 1    ', bool(ta.change(time(htf))) ? na : color_1, editable = false, display = display)
-plot(i_histPP and show_1 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_1 : na, 'PP 1    ', bool(ta.change(time(htf))) ? na : color_1, editable = false, display = display)
-plot(i_histPP and show_1_272 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_1_272 : na, 'PP 1_272', bool(ta.change(time(htf))) ? na : color_1_272, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_1_272 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_1_272 : na, 'PP 1_272', bool(ta.change(time(htf))) ? na : color_1_272, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_1_414 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_1_414 : na, 'PP 1_414', bool(ta.change(time(htf))) ? na : color_1_414, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_1_414 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_1_414 : na, 'PP 1_414', bool(ta.change(time(htf))) ? na : color_1_414, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_1_618 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_1_618 : na, 'PP 1_618', bool(ta.change(time(htf))) ? na : color_1_618, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_1_618 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_1_618 : na, 'PP 1_618', bool(ta.change(time(htf))) ? na : color_1_618, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_1_65 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_1_65 : na, 'PP 1_65 ', bool(ta.change(time(htf))) ? na : color_1_65, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_1_65 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_1_65 : na, 'PP 1_65 ', bool(ta.change(time(htf))) ? na : color_1_65, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_2_618 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_2_618 : na, 'PP 2_618', bool(ta.change(time(htf))) ? na : color_2_618, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_2_618 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_2_618 : na, 'PP 2_618', bool(ta.change(time(htf))) ? na : color_2_618, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_2_65 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_2_65 : na, 'PP 2_65 ', bool(ta.change(time(htf))) ? na : color_2_65, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_2_65 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_2_65 : na, 'PP 2_65 ', bool(ta.change(time(htf))) ? na : color_2_65, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_3_618 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_3_618 : na, 'PP 3_618', bool(ta.change(time(htf))) ? na : color_3_618, 1, plot.style_cross, editable = false, display = display)
-plot(i_histPP and show_3_618 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_3_618 : na, 'PP 3_618', bool(ta.change(time(htf))) ? na : color_3_618, 1, plot.style_cross, editable = false, display = display)
+plot(i_histPP and show_0 ? math.avg(htf_h1, htf_l1, htf_c1) : na, 'PP', bool(ta.change(time(htf))) ? na : color_0, editable = false)
+plot(i_histPP and show_0_236 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_0_236 : na, 'PP 0_236', bool(ta.change(time(htf))) ? na : color_0_236, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_0_236 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_0_236 : na, 'PP 0_236', bool(ta.change(time(htf))) ? na : color_0_236, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_0_382 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_0_382 : na, 'PP 0_382', bool(ta.change(time(htf))) ? na : color_0_382, editable = false)
+plot(i_histPP and show_0_382 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_0_382 : na, 'PP 0_382', bool(ta.change(time(htf))) ? na : color_0_382, editable = false)
+plot(i_histPP and show_0_5 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_0_5 : na, 'PP 0_5  ', bool(ta.change(time(htf))) ? na : color_0_5, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_0_5 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_0_5 : na, 'PP 0_5  ', bool(ta.change(time(htf))) ? na : color_0_5, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_0_618 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_0_618 : na, 'PP 0_618', bool(ta.change(time(htf))) ? na : color_0_618, editable = false)
+plot(i_histPP and show_0_618 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_0_618 : na, 'PP 0_618', bool(ta.change(time(htf))) ? na : color_0_618, editable = false)
+plot(i_histPP and show_0_65 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_0_65 : na, 'PP 0_65 ', bool(ta.change(time(htf))) ? na : color_0_65, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_0_65 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_0_65 : na, 'PP 0_65 ', bool(ta.change(time(htf))) ? na : color_0_65, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_0_786 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_0_786 : na, 'PP 0_786', bool(ta.change(time(htf))) ? na : color_0_786, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_0_786 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_0_786 : na, 'PP 0_786', bool(ta.change(time(htf))) ? na : color_0_786, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_1 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_1 : na, 'PP 1    ', bool(ta.change(time(htf))) ? na : color_1, editable = false)
+plot(i_histPP and show_1 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_1 : na, 'PP 1    ', bool(ta.change(time(htf))) ? na : color_1, editable = false)
+plot(i_histPP and show_1_272 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_1_272 : na, 'PP 1_272', bool(ta.change(time(htf))) ? na : color_1_272, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_1_272 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_1_272 : na, 'PP 1_272', bool(ta.change(time(htf))) ? na : color_1_272, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_1_414 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_1_414 : na, 'PP 1_414', bool(ta.change(time(htf))) ? na : color_1_414, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_1_414 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_1_414 : na, 'PP 1_414', bool(ta.change(time(htf))) ? na : color_1_414, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_1_618 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_1_618 : na, 'PP 1_618', bool(ta.change(time(htf))) ? na : color_1_618, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_1_618 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_1_618 : na, 'PP 1_618', bool(ta.change(time(htf))) ? na : color_1_618, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_1_65 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_1_65 : na, 'PP 1_65 ', bool(ta.change(time(htf))) ? na : color_1_65, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_1_65 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_1_65 : na, 'PP 1_65 ', bool(ta.change(time(htf))) ? na : color_1_65, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_2_618 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_2_618 : na, 'PP 2_618', bool(ta.change(time(htf))) ? na : color_2_618, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_2_618 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_2_618 : na, 'PP 2_618', bool(ta.change(time(htf))) ? na : color_2_618, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_2_65 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_2_65 : na, 'PP 2_65 ', bool(ta.change(time(htf))) ? na : color_2_65, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_2_65 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_2_65 : na, 'PP 2_65 ', bool(ta.change(time(htf))) ? na : color_2_65, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_3_618 ? math.avg(htf_h1, htf_l1, htf_c1) - (htf_h1 - htf_l1) * value_3_618 : na, 'PP 3_618', bool(ta.change(time(htf))) ? na : color_3_618, 1, plot.style_cross, editable = false)
+plot(i_histPP and show_3_618 ? math.avg(htf_h1, htf_l1, htf_c1) + (htf_h1 - htf_l1) * value_3_618 : na, 'PP 3_618', bool(ta.change(time(htf))) ? na : color_3_618, 1, plot.style_cross, editable = false)
 
 
 // ---------------------------------------------------------------------------------------------- //
@@ -667,8 +667,8 @@ tooltip_high_volatility =
 i_hATRLb = input.bool(true, '⚡ High Volatility Detection', group = group_vol_vol, tooltip = tooltip_high_volatility)
 i_weightedATR =
      ta.atr(
-         input.int(13, '  ATR Length', inline = 'ATR', group = group_vol_vol, display = display)
-     ) * input.float(2.718, 'Multiplier', minval = .1, step = .1, inline = 'ATR', group = group_vol_vol, display = display)
+         input.int(13, '  ATR Length', inline = 'ATR', group = group_vol_vol)
+     ) * input.float(2.718, 'Multiplier', minval = .1, step = .1, inline = 'ATR', group = group_vol_vol)
 
 
 // ---------------------------------------------------------------------------------------------- //
@@ -678,7 +678,7 @@ group_vol = 'Volume AddOns'
 
 i_vSMA = ta.sma(
      nz(volume),
-     input.int(89, 'Volume Moving Average Length', group = group_vol, display = display)
+     input.int(89, 'Volume Moving Average Length', group = group_vol)
 )
 
 tooltip_volume_spike_sign_of_exhaustion =
@@ -689,7 +689,7 @@ tooltip_volume_spike_sign_of_exhaustion =
  'These events often occur near climactic moves, exhaustion points, or strong participation surges.'
 
 i_vSpikeLb = input.bool(true, '🚦 Volume Spike · Potential Exhaustion', group = group_vol, tooltip = tooltip_volume_spike_sign_of_exhaustion)
-i_vSpikeThresh = input.float(4.669, '  Volume Spike Threshold', minval = .1, step = .1, group = group_vol, display = display)
+i_vSpikeThresh = input.float(4.669, '  Volume Spike Threshold', minval = .1, step = .1, group = group_vol)
 
 
 tooltip_volume_weighted_colored_bars =
@@ -702,8 +702,8 @@ tooltip_volume_weighted_colored_bars =
  'Helps visually confirm momentum, conviction, and participation behind price movement.'
 
 i_vwcb = input.bool(true, 'Volume-Weighted Colored Bars', group = group_vol, tooltip = tooltip_volume_weighted_colored_bars)
-i_vwcbHighThresh = input.float(1.618, '  Volume Threshold: High', minval = 1., step = .1, inline = 'VWC', group = group_vol, display = display)
-i_vwcbLowThresh  = input.float(0.618, 'Low',  minval = .1, step = .1, inline = 'VWC', group = group_vol, display = display)
+i_vwcbHighThresh = input.float(1.618, '  Volume Threshold: High', minval = 1., step = .1, inline = 'VWC', group = group_vol)
+i_vwcbLowThresh  = input.float(0.618, 'Low',  minval = .1, step = .1, inline = 'VWC', group = group_vol)
 
 
 nzVolume = nz(volume)
@@ -712,11 +712,11 @@ bearCandle = close < open
 range_1 = math.abs(high - low)
 
 exhaustVol = nzVolume > i_vSpikeThresh * i_vSMA
-plotchar(i_vSpikeLb and bool(nzVolume) ? exhaustVol : false, 'Exhaustion Bar', '🚦', location.abovebar, size = size.tiny, editable = false, display = display)
+plotchar(i_vSpikeLb and bool(nzVolume) ? exhaustVol : false, 'Exhaustion Bar', '🚦', location.abovebar, size = size.tiny, editable = false)
 alertcondition(ta.crossover(nzVolume, i_vSMA * i_vSpikeThresh), 'Volume Spikes', 'sign of exhaustion, huge volume increase detected\n{{exchange}}:{{ticker}}->\nOpen = {{open}}, Current = {{close}},\nTime = {{time}}')
 
 highVolatility = range_1 > i_weightedATR
-plotchar(i_hATRLb ? highVolatility : false, 'High Volatile Bar', '⚡', location.belowbar, size = size.tiny, editable = false, display = display)
+plotchar(i_hATRLb ? highVolatility : false, 'High Volatile Bar', '⚡', location.belowbar, size = size.tiny, editable = false)
 alertcondition(ta.crossover(range_1, i_weightedATR), 'High Volatility', 'high volatility detected\n{{exchange}}:{{ticker}}->\nOpen = {{open}}, Current = {{close}},\nTime = {{time}}')
 
 vwcbCol = nzVolume > i_vSMA * i_vwcbHighThresh ? bullCandle ? #006400 : #910000 : nzVolume < i_vSMA * i_vwcbLowThresh ? bearCandle ? #FF9800 : #7FFFD4 : na
