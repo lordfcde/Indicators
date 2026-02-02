@@ -181,19 +181,18 @@ if not na(curr_price_high)
     prev_rsi_high := rsi_val[pivot_lookback]
     prev_high_bar := bar_index - pivot_lookback
 
-// ==========================================
-// 5. CANDLE COLORING
-// ==========================================
+// ===== CANDLE COLORING - ĐẬM DẦN THEO BIẾN ĐỘNG =====
+// Tính độ đậm (0 = đậm nhất, 90 = nhạt nhất)
+volatility_score = math.max(vol_ratio, spread / atr_val)  // Điểm biến động
+transparency = volatility_score >= 3.0 ? 0 :    // Biến động cực mạnh = Đậm nhất
+               volatility_score >= 2.0 ? 15 :   // Biến động mạnh
+               volatility_score >= 1.5 ? 30 :   // Biến động khá
+               volatility_score >= 1.0 ? 50 :   // Bình thường
+               volatility_score >= 0.5 ? 70 :   // Yếu
+               85                                // Rất yếu = Nhạt nhất
 
-// Nến VOLATILITY SURGE = Viền đậm (dùng màu đặc biệt)
-candle_color = is_volatility_surge and is_bullish ? color.new(color.yellow, 0) :  // Vàng đậm - Tiền mạnh
-               is_volatility_surge and is_bearish ? color.new(color.fuchsia, 0) :  // Tím đậm - Biến động mạnh
-               is_vol_climax and is_bullish and close_position > 0.6 ? color.yellow :
-               is_vol_climax and is_bearish and close_position > 0.6 ? color.aqua :
-               is_vol_high and is_bullish ? color.teal :
-               is_vol_high and is_bearish ? color.maroon :
-               is_vol_dry ? color.gray :
-               is_bullish ? color.green : color.red
+// Màu nến theo xu hướng + độ đậm theo biến động
+candle_color = is_bullish ? color.new(color.green, transparency) : color.new(color.red, transparency)
 
 barcolor(candle_color)
 
