@@ -212,4 +212,4 @@ drawLevel(l10_show, l10_ratio, l10_color, false)
 // ═══════════════════════════════════════════════════════════════════════════════
 // ALERTS
 // ═══════════════════════════════════════════════════════════════════════════════
-alertcondition(ta.cross(close, pivot), "Cross Pivot Point", "Price crossed Pivot Point")
+alertcondition(ta.cross(close, pivot), "Cross Pivot Point", "Price crossed Pisvot Point")
