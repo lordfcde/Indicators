@@ -190,7 +190,7 @@ drawLevel(startTime, endTime, priceVal, levelName, ratio, levelColor, levelStyle
 
 drawNewPivots(startTime) =>
     newGraphics = array.new<pivotGraphic>()
-    lineEndTime = startTime + timeframe.in_seconds(pivotTimeframe) * 1000
+    lineEndTime = startTime + timeframe.in_seconds(pivotTimeframe) * 500  // 50% shorter
     
     // PP
     if pp_show
