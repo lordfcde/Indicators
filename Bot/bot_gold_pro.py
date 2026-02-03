@@ -376,30 +376,14 @@ def scan_liquidity():
             # 1. TB 20 phiên > 100k
             # 2. TB 3 tháng > 50k
             if ma20 > 100000 and ma60 > 50000:
-                # 3. Check Market Cap > 1000 Tỷ
-                # Note: 'finance.ratio' returns values in raw VND despite label saying Tỷ
-                try:
-                    fin = stock.finance.ratio(period='quarterly', latest=True)
-                    if not fin.empty:
-                        # Value usually at row 0, col ('Chỉ tiêu định giá', 'Vốn hóa (Tỷ đồng)')
-                        # Let's try to find it dynamically or hardcode safe access
-                        mcap = fin.iloc[0]['Chỉ tiêu định giá']['Vốn hóa (Tỷ đồng)']
-                        
-                        # 1000 Ty = 1000 * 1,000,000,000
-                        if mcap > 1_000_000_000_000:
-                            qualified.append(sym)
-                            # print(f"   -> {sym} OK (Vol & Cap {mcap/1e9:.0f}B)")
-                except:
-                     # If fail to get finance, maybe skip or include? 
-                     # Safe to skip to ensure quality
-                     pass
+                qualified.append(sym)
                 
         except: pass
         
         count += 1
         if count % 100 == 0: print(f"   -> Đã quét {count}/{total} mã...")
         
-    print(f"✅ Quét xong! Tìm thấy {len(qualified)} mã đủ ĐK Thanh khoản & Vốn hóa.")
+    print(f"✅ Quét xong! Tìm thấy {len(qualified)} mã đủ thanh khoản.")
     return qualified
 
 def check_volume_breakout(symbol):
