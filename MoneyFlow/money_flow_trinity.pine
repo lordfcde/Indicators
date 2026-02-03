@@ -306,8 +306,35 @@ f_check_div_bull() =>
     
     _is_bull
 
-// Get 1H Bullish Divergence regarding USER REQUEST
+// Helper function to check Regular Bearish Divergence on HTF
+f_check_div_bear() =>
+    _rsi = ta.rsi(close, rsi_len)
+    _ph = ta.pivothigh(high, pivot_lookback, pivot_lookback)
+    _rh = ta.pivothigh(_rsi, pivot_lookback, pivot_lookback)
+    
+    var float _prev_ph = na
+    var float _prev_rh = na
+    
+    _is_bear = false
+    
+    if not na(_ph) and not na(_prev_ph)
+        _price_hh = high[pivot_lookback] > _prev_ph  // Price Higher High
+        _rsi_lh = _rsi[pivot_lookback] < _prev_rh  // RSI Lower High
+        _ob = _rsi[pivot_lookback] > 60
+        if _price_hh and _rsi_lh and _ob
+            _is_bear := true
+            
+    if not na(_ph)
+        _prev_ph := high[pivot_lookback]
+        _prev_rh := _rsi[pivot_lookback]
+    
+    _is_bear
+
+// Get 1H Bullish Divergence verification
 regular_bullish_1h = request.security(syminfo.tickerid, "60", f_check_div_bull())
+
+// Get Daily Divergences (Both Bull/Bear)
+[regular_bullish_d, regular_bearish_d] = request.security(syminfo.tickerid, "D", [f_check_div_bull(), f_check_div_bear()])
 
 // Pivot detection
 price_pivot_low = ta.pivotlow(low, pivot_lookback, pivot_lookback)
@@ -551,6 +578,10 @@ plotshape(sell_sig and not sell_sig[1], "Sell", shape.labeldown, location.top, c
 plotshape((sell_reversal or sell_precaution) and not (sell_reversal or sell_precaution)[1] and not sell_sig[1], "Sell Precaution", shape.triangledown, location.top, color.orange, text="⚠️", size=size.small)
 plotshape(sell_warning and not sell_sig and not sell_warning[1] and not sell_reversal[1] and not sell_precaution[1], "Bearish Divergence", shape.xcross, location.top, color.fuchsia, text="PK-", size=size.tiny)
 
+// DAILY DIVERGENCE ALERTS
+plotshape(regular_bullish_d, "Daily Bull Div", shape.diamond, location.bottom, color.blue, text="D-PK+", size=size.small)
+plotshape(regular_bearish_d, "Daily Bear Div", shape.diamond, location.top, color.fuchsia, text="D-PK-", size=size.small)
+
 // ==========================================
 // 10. DASHBOARD (ĐƠN GIẢN)
 // ==========================================
@@ -638,3 +669,5 @@ alertcondition(regular_bullish, "🟣 REGULAR BULLISH", "RSI Regular Bullish Div
 alertcondition(regular_bearish, "🔴 BEARISH DIV", "RSI Bearish Divergence - CẢNH BÁO!")
 alertcondition(is_volatility_surge, "⚡ VOLATILITY", "Volume/Price Surge Detected!")
 alertcondition(sell_sig, "🔴 BÁN", "Sell Signal!")
+alertcondition(regular_bullish_d, "🔵 DAILY BULL DIV", "Daily Regular Bullish Divergence Detected!")
+alertcondition(regular_bearish_d, "🔴 DAILY BEAR DIV", "Daily Regular Bearish Divergence Detected!")
