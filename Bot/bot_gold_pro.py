@@ -327,10 +327,54 @@ def check_vnstock(message):
 # ==========================================
 # 6. SCANNER THREAD (New format + Persistence)
 # ==========================================
-WATCHLIST = [
-    "HPG", "SSI", "VND", "DIG", "CEO", "MWG", "FPT", "VCB", "STB", "NVL", "PDR",
-    "VIC", "VHM", "TCB", "VPB", "MBB", "ACB", "MSN", "GAS", "VNM"
-]
+
+def get_market_symbols():
+    try:
+        from vnstock import Listing
+        l = Listing(source='VCI')
+        df = l.all_symbols()
+        return df['symbol'].tolist()
+    except:
+        return []
+
+def scan_liquidity():
+    """Scan toàn bộ thị trường để lọc mã thanh khoản cao (Chạy 1 lần đầu ngày)"""
+    print("🔄 Đang quét thanh khoản toàn thị trường (có thể mất 15 phút)...")
+    symbols = get_market_symbols()
+    qualified = []
+    
+    from datetime import timedelta
+    end_date = datetime.now().strftime('%Y-%m-%d')
+    start_date = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d') # 3 tháng
+    
+    count = 0
+    total = len(symbols)
+    
+    for sym in symbols:
+        try:
+            # Lấy data
+            stock = Vnstock().stock(symbol=sym, source='VCI')
+            df = stock.quote.history(start=start_date, end=end_date, interval='1D')
+            
+            if len(df) < 60: continue # Ít nhất 3 tháng dữ liệu
+            
+            vol = df['volume']
+            ma20 = vol.tail(20).mean()
+            ma60 = vol.tail(60).mean()
+            
+            # Điều kiện thanh khoản:
+            # 1. TB 20 phiên > 100k
+            # 2. TB 3 tháng > 50k
+            if ma20 > 100000 and ma60 > 50000:
+                qualified.append(sym)
+                
+        except: pass
+        
+        count += 1
+        if count % 100 == 0: print(f"   -> Đã quét {count}/{total} mã...")
+        
+    print(f"✅ Quét xong! Tìm thấy {len(qualified)} mã đủ thanh khoản.")
+    return qualified
 
 def check_volume_breakout(symbol):
     try:
@@ -369,6 +413,18 @@ def run_vnstock_scanner():
     print("⏰ VNStock Scanner Thread Started...")
     alerted_stocks = {} 
     
+    # Load watchlist từ file nếu có
+    data = load_data()
+    watchlist = data.get('liquid_watchlist', [])
+    
+    # Nếu chưa có watchlist (lần đầu chạy), quét ngay
+    if not watchlist:
+        watchlist = scan_liquidity()
+        data['liquid_watchlist'] = watchlist
+        save_data(data)
+    else:
+        print(f"✅ Đã load {len(watchlist)} mã từ cache.")
+    
     while True:
         try:
             now = datetime.now()
@@ -376,14 +432,17 @@ def run_vnstock_scanner():
             today_str = now.strftime('%Y-%m-%d')
             time_str = now.strftime('%H:%M:%S')
 
-            # --- AUTO CLEAR LOGIC (8:50 AM, Mon-Fri) ---
-            # 0=Mon, 4=Fri. Weekday < 5 means Mon-Fri.
-            if now.weekday() < 5 and current_hour == 8 and now.minute >= 50:
+            # --- AUTO CLEAR & RESCAN LOGIC (8:50 AM, Mon-Fri) ---
+            if now.weekday() < 5 and current_hour == 8 and now.minute >= 45: # Sớm hơn tí để quét kịp
                  data = load_data()
                  if data['last_clear'] != today_str:
-                     print("🧹 Clearing Daily Watchlist for new session...")
-                     data['daily'] = [] # Clear daily list
+                     print("🧹 Starting New Day & Re-scanning Liquidity...")
+                     data['daily'] = [] 
                      data['last_clear'] = today_str
+                     
+                     # Rescan Liquidity
+                     watchlist = scan_liquidity()
+                     data['liquid_watchlist'] = watchlist
                      
                      # Clean history > 7 days
                      from datetime import timedelta
@@ -391,12 +450,12 @@ def run_vnstock_scanner():
                      data['history'] = [h for h in data['history'] if h['date'] > cutoff_date]
                      
                      save_data(data)
-                     alerted_stocks = {} # Reset spam check memory
+                     alerted_stocks = {} 
 
             # --- SCANNER LOGIC (9h - 15h) ---
             if 9 <= current_hour <= 15:
-                # print(f"🔄 Scanning VNStock ({len(WATCHLIST)} mã)...")
-                for symbol in WATCHLIST:
+                # Loop through dynamic wathclist
+                for symbol in watchlist:
                     if symbol in alerted_stocks and alerted_stocks[symbol] == today_str:
                         continue
                         
@@ -410,20 +469,17 @@ def run_vnstock_scanner():
                         price_display = result['price'] * 1000
                         vol_increase_pct = (result['ratio'] - 1) * 100
                         
-                        # Logging & Persistence
+                        # Logging
                         logging.info(f"VNSTOCK_BREAKOUT: {symbol} | Vol: {result['current_vol']} | Incr: +{vol_increase_pct:.1f}%")
                         
                         # Save to JSON
                         data = load_data()
-                        
-                        # Add to Daily
                         data['daily'].append({
                             "symbol": symbol,
                             "time": time_str,
                             "vol_pct": vol_increase_pct
                         })
                         
-                        # Add to History (Unique per date)
                         history_exists = any(h['symbol'] == symbol and h['date'] == today_str for h in data['history'])
                         if not history_exists:
                             data['history'].append({
@@ -445,10 +501,10 @@ def run_vnstock_scanner():
                             alerted_stocks[symbol] = today_str
                         except Exception as e:
                             logging.error(f"Send Error: {e}")
-                    time.sleep(2)
-                time.sleep(300) 
+                    time.sleep(1) # Faster check since we have many stocks
+                time.sleep(120) # 2 mins check loop
             else:
-                time.sleep(1800)
+                time.sleep(600)
         except Exception as e:
             print(f"Scanner Error: {e}")
             time.sleep(60)
