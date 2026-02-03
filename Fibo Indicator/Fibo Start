@@ -16,6 +16,7 @@ showLabelsInput = input.bool(title="Show Labels", defval=true, group="Labels")
 showPricesInput = input.bool(title="Show Prices", defval=true, group="Labels")
 positionLabelsInput = input.string("Left", "Labels Position", options=["Left", "Right"], group="Labels")
 linewidthInput = input.int(title="Line Width", defval=1, minval=1, maxval=5, group="Style")
+lineLengthInput = input.int(title="Line Length %", defval=100, minval=10, maxval=500, step=10, group="Style", tooltip="Độ dài đường pivot theo % của khoảng thời gian")
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // FIBONACCI LEVELS - 13 Levels with Show/Ratio/Color/Style
@@ -173,11 +174,10 @@ drawLevel(startTime, endTime, priceVal, levelName, ratio, levelColor, levelStyle
         pivotLine = line.new(startTime, priceVal, endTime, priceVal, xloc=xloc.bar_time, color=levelColor, width=widthVal, style=lineStyleVal)
         
         // Label text: "R3 PP 1.0 (28150)"
+        // Label chỉ hiển thị giá (gọn gàng)
         labelText = ""
-        if showLabelsInput
-            labelText := levelName + " " + str.tostring(ratio)
         if showPricesInput
-            labelText := labelText + " (" + str.tostring(priceVal, format.mintick) + ")"
+            labelText := str.tostring(priceVal, format.mintick)
         
         labelX = positionLabelsInput == "Left" ? startTime : endTime
         labelStyleVal = positionLabelsInput == "Left" ? label.style_label_right : label.style_label_left
@@ -190,7 +190,7 @@ drawLevel(startTime, endTime, priceVal, levelName, ratio, levelColor, levelStyle
 
 drawNewPivots(startTime) =>
     newGraphics = array.new<pivotGraphic>()
-    lineEndTime = startTime + timeframe.in_seconds(pivotTimeframe) * 250  // 50% shorter
+    lineEndTime = startTime + timeframe.in_seconds(pivotTimeframe) * 500 * lineLengthInput / 100  // Tuỳ chỉnh theo %
     
     // PP
     if pp_show
