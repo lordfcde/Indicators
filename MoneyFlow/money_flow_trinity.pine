@@ -436,8 +436,16 @@ cond_cooldown_buy = bars_since_buy >= buy_cooldown
 // MUA AN TOÀN - CHỈ KHI HISTOGRAM KHÔNG YẾU DẦN
 buy_safe = cond_cmf_ok and cond_ema_ok and ck_cross_up and cond_cooldown_buy and not is_histogram_green_weakening
 
-// MUA MẠNH (Wyckoff + RSI Confirm)
-super_buy = (buy_safe and cond_vsa_ok) or hidden_bullish[pivot_lookback]
+// KIM CƯƠNG 💎 (MARGIN BUY) - CỰC KỲ CHẶT CHẼ
+// Điều kiện: 
+// 1. Histogram xanh MẠNH (> 0.05 và đang tăng)
+// 2. Chaikin đang cắt XUỐNG (không được ở cao) - tức đã qua đỉnh
+// 3. VSA tích cực HOẶC RSI divergence
+histogram_strong = mf > 0.05 and is_histogram_strengthening
+chaikin_cutting_down = ck_raw < ck_raw[1] and ck_raw[1] < ck_raw[2]  // Đang giảm 2 phiên
+chaikin_not_high = ck_raw < 0.5 * ta.highest(ck_raw, 20)  // Không ở 50% đỉnh gần nhất
+
+super_buy = ((buy_safe and cond_vsa_ok and histogram_strong and (chaikin_cutting_down or chaikin_not_high)) or hidden_bullish[pivot_lookback]) and histogram_strong
 
 if buy_safe or super_buy
     bars_since_buy := 0
