@@ -396,6 +396,33 @@ cmf_recovering = mf < 0 and mf > mf[1] and mf[1] > mf[2]
 ck_cross_up = ta.crossover(ck_raw, 0)
 ck_cross_down = ta.crossunder(ck_raw, 0)
 
+// ==========================================
+// KIỂM TRA XUNG LỰC HISTOGRAM (Momentum Strength)
+// ==========================================
+// Histogram đang yếu dần = Giảm liên tiếp trong 3 phiên
+histogram_weakening_lookback = 3
+
+// Kiểm tra histogram đỏ yếu dần (đang giảm âm độ liên tiếp)
+mf_negative = mf < 0
+mf_weakening_count = 0
+for i = 0 to histogram_weakening_lookback - 1
+    if mf[i] < 0 and math.abs(mf[i]) < math.abs(mf[i+1])
+        mf_weakening_count := mf_weakening_count + 1
+
+is_histogram_red_weakening = mf_negative and mf_weakening_count >= 2  // 2/3 phiên yếu dần
+
+// Kiểm tra histogram xanh yếu dần (đang giảm dương độ liên tiếp)
+mf_positive = mf > 0
+mf_green_weakening_count = 0
+for i = 0 to histogram_weakening_lookback - 1
+    if mf[i] > 0 and mf[i] < mf[i+1]
+        mf_green_weakening_count := mf_green_weakening_count + 1
+
+is_histogram_green_weakening = mf_positive and mf_green_weakening_count >= 2  // 2/3 phiên yếu dần
+
+// Histogram đang mạnh dần (tăng liên tiếp)
+is_histogram_strengthening = (mf > 0 and mf > mf[1] and mf[1] > mf[2]) or (mf < 0 and math.abs(mf) > math.abs(mf[1]) and math.abs(mf[1]) > math.abs(mf[2]))
+
 var int bars_since_sell = 100
 var int bars_since_buy = 100
 bars_since_sell := bars_since_sell + 1
@@ -406,8 +433,8 @@ cond_ema_ok = ema_count_above >= 2
 cond_vsa_ok = accumulation_sign or is_spring or is_shakeout or easy_move_up
 cond_cooldown_buy = bars_since_buy >= buy_cooldown
 
-// MUA AN TOÀN
-buy_safe = cond_cmf_ok and cond_ema_ok and ck_cross_up and cond_cooldown_buy
+// MUA AN TOÀN - CHỈ KHI HISTOGRAM KHÔNG YẾU DẦN
+buy_safe = cond_cmf_ok and cond_ema_ok and ck_cross_up and cond_cooldown_buy and not is_histogram_green_weakening
 
 // MUA MẠNH (Wyckoff + RSI Confirm)
 super_buy = (buy_safe and cond_vsa_ok) or hidden_bullish[pivot_lookback]
@@ -421,13 +448,13 @@ buy_early = ((is_spring or is_shakeout or accumulation_sign) and cmf_recovering 
 if buy_early
     bars_since_buy := 0
 
-// BÁN
+// BÁN - CHỈ KHI HISTOGRAM ĐỎ KHÔNG YẾU DẦN
 cond_cmf_weak = mf < 0 and mf < mf[1]
 cond_ema_weak = ema_count_above <= 1
 cond_vsa_sell = hidden_distribution or is_upthrust
 cond_cooldown_sell = bars_since_sell >= sell_cooldown
 
-sell_sig = ((cond_cmf_weak and ck_cross_down) or cond_vsa_sell or regular_bearish[pivot_lookback]) and cond_ema_weak and cond_cooldown_sell
+sell_sig = ((cond_cmf_weak and ck_cross_down) or cond_vsa_sell or regular_bearish[pivot_lookback]) and cond_ema_weak and cond_cooldown_sell and not is_histogram_red_weakening
 
 if sell_sig
     bars_since_sell := 0
