@@ -503,6 +503,18 @@ if sell_reversal
 sell_warning = rsi_overbought and regular_bearish[pivot_lookback]
 
 // ==========================================
+// TÍN HIỆU ĐỀ PHÒNG: Histogram xanh -> đỏ + giá dưới EMA
+// ==========================================
+// Khi histogram đổi từ xanh sang đỏ = dòng tiền bắt đầu ra
+histogram_just_turned_red = mf[1] > 0 and mf < 0  // Vừa đổi từ xanh sang đỏ
+price_below_ema = not above_ema50 or not above_ema144  // Giá dưới EMA50 hoặc EMA144
+
+sell_precaution = histogram_just_turned_red and price_below_ema and cond_cooldown_sell
+
+if sell_precaution
+    bars_since_sell := 0
+
+// ==========================================
 // 9. HIỂN THỊ TÍN HIỆU
 // ==========================================
 plotshape(super_buy and not super_buy[1], "Super Buy", shape.labelup, location.bottom, color.yellow, text="💎", size=size.normal)
@@ -510,7 +522,8 @@ plotshape(buy_safe and not super_buy and not buy_safe[1], "Buy Safe", shape.labe
 plotshape(buy_early and not buy_safe and not buy_early[1], "Buy Early", shape.triangleup, location.bottom, color.orange, text="SỚM", size=size.small)
 plotshape(sell_sig and not sell_sig[1], "Sell", shape.labeldown, location.top, color.red, text="BÁN", size=size.small)
 plotshape(sell_reversal and not sell_reversal[1], "Sell Reversal", shape.labeldown, location.top, color.maroon, text="🚨", size=size.normal)
-plotshape(sell_warning and not sell_sig and not sell_warning[1] and not sell_reversal[1], "Sell Warning", shape.xcross, location.top, color.fuchsia, size=size.tiny)
+plotshape(sell_precaution and not sell_precaution[1] and not sell_sig[1] and not sell_reversal[1], "Sell Precaution", shape.triangledown, location.top, color.orange, text="⚠️", size=size.small)
+plotshape(sell_warning and not sell_sig and not sell_warning[1] and not sell_reversal[1] and not sell_precaution[1], "Sell Warning", shape.xcross, location.top, color.fuchsia, size=size.tiny)
 
 // ==========================================
 // 10. DASHBOARD (ĐƠN GIẢN)
