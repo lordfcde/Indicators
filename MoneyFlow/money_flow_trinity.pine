@@ -433,12 +433,13 @@ cond_ema_ok = ema_count_above >= 2
 cond_vsa_ok = accumulation_sign or is_spring or is_shakeout or easy_move_up
 cond_cooldown_buy = bars_since_buy >= buy_cooldown
 
-// MUA AN TOÀN (MÚC) - CHỈ KHI HISTOGRAM ĐỦ MẠNH VÀ KHÔNG RSI DIVERGENCE
+// MUA AN TOÀN (MÚC) - CHỈ KHI HISTOGRAM XANH (UPTREND)
 // Tránh tín hiệu khi chỉ là hồi kỹ thuật yếu
+histogram_green = mf > 0  // Histogram phải XANH (dòng tiền đã vào)
 histogram_sufficient = mf > 0.03  // Histogram phải đủ mạnh, không quá yếu
 no_rsi_divergence = not regular_bullish[pivot_lookback] and not hidden_bullish[pivot_lookback]  // Không có phân kỳ RSI
 
-buy_safe = cond_cmf_ok and cond_ema_ok and ck_cross_up and cond_cooldown_buy and not is_histogram_green_weakening and histogram_sufficient and no_rsi_divergence
+buy_safe = cond_cmf_ok and cond_ema_ok and ck_cross_up and cond_cooldown_buy and not is_histogram_green_weakening and histogram_green and histogram_sufficient and no_rsi_divergence
 
 // KIM CƯƠNG 💎 (MARGIN BUY) - CỰC KỲ CHẶT CHẼ
 // Điều kiện: 
@@ -454,8 +455,11 @@ super_buy = ((buy_safe and cond_vsa_ok and histogram_strong and (chaikin_cutting
 if buy_safe or super_buy
     bars_since_buy := 0
 
-// MUA SỚM (RSI Divergence / Spring)
-buy_early = ((is_spring or is_shakeout or accumulation_sign) and cmf_recovering and cond_cooldown_buy) or regular_bullish[pivot_lookback]
+// MUA SỚM (SỚM) - Histogram còn ĐỎ nhưng Chaikin đã cắt lên 0
+// Đây là tín hiệu đảo chiều sớm, dòng tiền bắt đầu vào
+histogram_red = mf < 0  // Histogram vẫn còn đỏ
+chaikin_above_zero = ck_raw > 0  // Chaikin đã vượt lên trên 0
+buy_early = histogram_red and ck_cross_up and cond_cooldown_buy
 
 if buy_early
     bars_since_buy := 0
