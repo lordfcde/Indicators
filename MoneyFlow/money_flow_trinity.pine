@@ -282,6 +282,33 @@ if barstate.islast and i_showOB and array.size(bear_ob_top) > 0
 // 4. RSI DIVERGENCE DETECTION
 // ==========================================
 
+// Helper function to check Regular Bullish Divergence on HTF (1H)
+f_check_div_bull() =>
+    _rsi = ta.rsi(close, rsi_len)
+    _pl = ta.pivotlow(low, pivot_lookback, pivot_lookback)
+    _rl = ta.pivotlow(_rsi, pivot_lookback, pivot_lookback)
+    
+    var float _prev_pl = na
+    var float _prev_rl = na
+    
+    _is_bull = false
+    
+    if not na(_pl) and not na(_prev_pl)
+        _price_ll = low[pivot_lookback] < _prev_pl
+        _rsi_hl = _rsi[pivot_lookback] > _prev_rl
+        _os = _rsi[pivot_lookback] < 40
+        if _price_ll and _rsi_hl and _os
+            _is_bull := true
+            
+    if not na(_pl)
+        _prev_pl := low[pivot_lookback]
+        _prev_rl := _rsi[pivot_lookback]
+    
+    _is_bull
+
+// Get 1H Bullish Divergence regarding USER REQUEST
+regular_bullish_1h = request.security(syminfo.tickerid, "60", f_check_div_bull())
+
 // Pivot detection
 price_pivot_low = ta.pivotlow(low, pivot_lookback, pivot_lookback)
 price_pivot_high = ta.pivothigh(high, pivot_lookback, pivot_lookback)
@@ -459,7 +486,7 @@ if buy_safe or super_buy
 // Đây là tín hiệu đảo chiều sớm, dòng tiền bắt đầu vào
 histogram_red = mf < 0  // Histogram vẫn còn đỏ
 chaikin_above_zero = ck_raw > 0  // Chaikin đã vượt lên trên 0
-buy_early = histogram_red and ck_cross_up and cond_cooldown_buy
+buy_early = (histogram_red and ck_cross_up and cond_cooldown_buy) or regular_bullish_1h
 
 if buy_early
     bars_since_buy := 0
