@@ -173,11 +173,12 @@ drawLevel(startTime, endTime, priceVal, levelName, ratio, levelColor, levelStyle
         
         pivotLine = line.new(startTime, priceVal, endTime, priceVal, xloc=xloc.bar_time, color=levelColor, width=widthVal, style=lineStyleVal)
         
-        // Label text: "R3 PP 1.0 (28150)"
-        // Label chỉ hiển thị giá (gọn gàng)
+        // Label text: "R3 (28150)" - Hiển thị tên level + giá, ẩn ratio
         labelText = ""
+        if showLabelsInput
+            labelText := levelName
         if showPricesInput
-            labelText := str.tostring(priceVal, format.mintick)
+            labelText := labelText + " (" + str.tostring(priceVal, format.mintick) + ")"
         
         labelX = positionLabelsInput == "Left" ? startTime : endTime
         labelStyleVal = positionLabelsInput == "Left" ? label.style_label_right : label.style_label_left
