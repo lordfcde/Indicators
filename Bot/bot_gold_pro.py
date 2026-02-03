@@ -25,6 +25,16 @@ logging.basicConfig(
 API_TOKEN = "8288173761:AAEhh0Km0LVNZIel15flHEGGh3ixY-4v0Nw"
 CHAT_ID = '1622117094'
 DATA_FILE = 'bot_data.json'
+VNSTOCK_API_KEY = "vnstock_66748eedeae48faaf4692adfbc3082dd" # API VIP
+
+# Apply Config
+try:
+    import vnstock
+    if 'change_api_key' in dir(vnstock):
+        print(f"🔑 Applying VNStock API Key...")
+        vnstock.change_api_key(VNSTOCK_API_KEY)
+except Exception as e:
+    print(f"⚠️ Could not set VNStock API Key: {e}")
 
 # Khởi tạo Bot
 bot = telebot.TeleBot(API_TOKEN)
@@ -71,7 +81,7 @@ def get_main_menu():
         InlineKeyboardButton("💰 Check Vàng", callback_data="check_gold"),
         InlineKeyboardButton("🚀 List Breakout", callback_data="check_breakout"),
         InlineKeyboardButton("📅 Lịch sử 7 ngày", callback_data="check_history"),
-        InlineKeyboardButton("🇻🇳 Check VN30", callback_data="check_vn30_guide"),
+        InlineKeyboardButton("🇻🇳 Check VN Stocks", callback_data="check_vn30_guide"),
         InlineKeyboardButton("ℹ️ Hướng dẫn", callback_data="help")
     )
     return markup
