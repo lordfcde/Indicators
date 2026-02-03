@@ -433,8 +433,12 @@ cond_ema_ok = ema_count_above >= 2
 cond_vsa_ok = accumulation_sign or is_spring or is_shakeout or easy_move_up
 cond_cooldown_buy = bars_since_buy >= buy_cooldown
 
-// MUA AN TOÀN - CHỈ KHI HISTOGRAM KHÔNG YẾU DẦN
-buy_safe = cond_cmf_ok and cond_ema_ok and ck_cross_up and cond_cooldown_buy and not is_histogram_green_weakening
+// MUA AN TOÀN (MÚC) - CHỈ KHI HISTOGRAM ĐỦ MẠNH VÀ KHÔNG RSI DIVERGENCE
+// Tránh tín hiệu khi chỉ là hồi kỹ thuật yếu
+histogram_sufficient = mf > 0.03  // Histogram phải đủ mạnh, không quá yếu
+no_rsi_divergence = not regular_bullish[pivot_lookback] and not hidden_bullish[pivot_lookback]  // Không có phân kỳ RSI
+
+buy_safe = cond_cmf_ok and cond_ema_ok and ck_cross_up and cond_cooldown_buy and not is_histogram_green_weakening and histogram_sufficient and no_rsi_divergence
 
 // KIM CƯƠNG 💎 (MARGIN BUY) - CỰC KỲ CHẶT CHẼ
 // Điều kiện: 
