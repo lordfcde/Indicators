@@ -28,10 +28,12 @@ cloudSupportThreshold = 0.003  // 0.3% threshold
 
 
 // 📊 RS RATING (IBD Style)
-i_showRS = input.bool(true, "Hiện RS Rating (IBD)")
-i_benchmark = input.symbol("VNINDEX", "Benchmark Index", tooltip="Mã chỉ số để so sánh (VNINDEX, VN30, hoặc SPX)")
+grp_rs = "📊 RS Rating (IBD)"
+i_showRS = input.bool(false, "Show RS Dashboard", group=grp_rs, tooltip="Hiện bảng RS Rating trên góc chart")
+i_benchmark = input.symbol("VNINDEX", "Benchmark Index", group=grp_rs, tooltip="Chỉ số để so sánh (VNINDEX, VN30, SPX...)")
 
 grp_display = "🎨 Hiển Thị"
+i_showHistogram = input.bool(true, "Hiện 📊 Money Flow Histogram", group=grp_display, tooltip="Histogram thể hiện dòng tiền (xanh=mua, đỏ=bán)")
 i_volSpikeLb = input.bool(true, "Hiện ⚡ Vol Đột biến", group=grp_display, tooltip="Volume cao gấp 2.5x MA20 + Giá biến động mạnh")
 i_volDryLb = input.bool(true, "Hiện 🚦 Vol Cạn kiệt", group=grp_display, tooltip="Volume thấp + Giá đi ngang = Tích lũy")
 i_candleColoring = input.bool(true, "Tô màu nến theo biến động", group=grp_display, tooltip="Nến đậm = biến động mạnh, nến nhạt = biến động yếu")
@@ -481,8 +483,8 @@ if stdev_cmf != 0 and stdev_ck != 0
 ck_visual = ck_raw / (scaler != 0 ? scaler : 1)
 
 hline(0, "Zero", color.gray, hline.style_dotted)
-plot(mf, "CMF", style=plot.style_columns, color=mf > 0 ? color.new(color.teal, 40) : color.new(color.red, 40), linewidth=3)
-plot(ck_visual, "Chaikin", color=color.orange, linewidth=2)
+plot(i_showHistogram ? mf : na, "CMF", style=plot.style_columns, color=mf > 0 ? color.new(color.teal, 40) : color.new(color.red, 40), linewidth=5)
+plot(i_showHistogram ? ck_visual : na, "Chaikin", color=color.orange, linewidth=3)
 
 // EMAs (Overlay)
 plot(ema50, "EMA 50", color=above_ema50 ? color.lime : color.red, linewidth=2, force_overlay=true)
@@ -508,9 +510,7 @@ plotshape(i_volSpikeLb and is_vol_spike, "⚡ Vol Đột biến", shape.diamond,
 // 🚦 VOLUME KIỆT - Volume thấp = Hết người bán = Tích cực  
 plotshape(i_volDryLb and is_vol_exhaustion, "🚦 Vol Kiệt", shape.circle, location.belowbar, color.lime, text="🚦", size=size.tiny, force_overlay=true)
 
-// ☁️ ICHIMOKU CLOUD MARKERS
-plotshape(at_cloud_support and cloudBullish and i_showIchimoku, "☁️ Cloud Support", shape.circle, location.belowbar, color.new(color.green, 30), text="☁️", size=size.tiny, force_overlay=true)
-plotshape(at_cloud_resistance and not cloudBullish and i_showIchimoku, "☁️ Cloud Resistance", shape.circle, location.abovebar, color.new(color.red, 30), text="☁️", size=size.tiny, force_overlay=true)
+
 
 // ==========================================
 // 8. TÍN HIỆU MUA/BÁN
@@ -723,6 +723,7 @@ rs_raw = 50 + (rs_diff * 0.8)
 // Giới hạn 1-99
 rs_rating = rs_raw > 99 ? 99 : rs_raw < 1 ? 1 : math.round(rs_raw)
 
+
 // ==========================================
 // 10. DASHBOARD (ĐƠN GIẢN)
 // ==========================================
@@ -793,14 +794,18 @@ if barstate.islast
     else if is_choppy_market
         rec_text := "QUAN SÁT 🔄"
         rec_bg := color.gray
-    // ƯU TIÊN 4: Dòng tiền vào mạnh 3+ phiên + UPTREND → MUA MARGIN (An toàn nhất)
-    else if is_critical_inflow and is_confirmed_uptrend
+    // ƯU TIÊN 4: Dòng tiền vào mạnh 3+ phiên + UPTREND + GIÁ TRÊN EMA50 → MUA MARGIN (An toàn nhất)
+    else if is_critical_inflow and is_confirmed_uptrend and above_ema50
         rec_text := "MUA MARGIN 🚀"
         rec_bg := color.teal
-    // ƯU TIÊN 5: Dòng tiền vào mạnh (3+ phiên chưa uptrend HOẶC 1 phiên + uptrend) → MUA MẠNH
-    else if is_critical_inflow or (is_strong_inflow and is_confirmed_uptrend)
+    // ƯU TIÊN 5: Dòng tiền vào mạnh (3+ phiên chưa uptrend HOẶC 1 phiên + uptrend) + GIÁ TRÊN EMA50 → MUA MẠNH
+    else if (is_critical_inflow or (is_strong_inflow and is_confirmed_uptrend)) and above_ema50
         rec_text := "MUA MẠNH 💪"
         rec_bg := color.lime
+    // ƯU TIÊN 5B: Dòng tiền vào mạnh NHƯNG GIÁ DƯỚI EMA50 (downtrend/sideway) → QUAN SÁT (không mua)
+    else if is_critical_inflow and not above_ema50
+        rec_text := "QUAN SÁT 👀"
+        rec_bg := color.gray
     // ƯU TIÊN 6: Dòng tiền vào nhẹ + (Lướt sóng OK hoặc Vào nhẹ 2+ phiên) + giá trên EMA233 → MUA 1 PHẦN
     else if is_light_inflow and above_ema233 and (above_ema50 or is_confirmed_light_inflow)
         rec_text := "MUA 1 PHẦN 👍"

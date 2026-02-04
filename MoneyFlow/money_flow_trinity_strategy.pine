@@ -1,259 +1,316 @@
-//@version=5
-// Coder Stock - Money Flow Trinity Strategy (Wyckoff VSA + RSI Divergence)
-// Chiến lược: Trung hạn + Wyckoff VSA + RSI Divergence + SL 8%
+//@version=6
+// Coder Stock - Money Flow Trinity Strategy (Updated with Latest Logic)
 // Author: Vinh
-strategy(title="CS Trinity VSA Strategy", shorttitle="CS_Trinity_VSA_Strat", overlay=true, initial_capital=100000000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, commission_type=strategy.commission.percent, commission_value=0.15, pyramiding=0)
+strategy(title="CS Trinity Master Strategy", shorttitle="CS Trinity Strat", overlay=true, 
+         initial_capital=100000000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, 
+         commission_type=strategy.commission.percent, commission_value=0.15, pyramiding=0)
 
 // ==========================================
-// CẤU HÌNH
+// SETTINGS
 // ==========================================
-grp_cmf = "1. CMF"
-cmf_len = input.int(20, "CMF Length", group=grp_cmf)
 
-grp_ck = "2. Chaikin"
-ck_fast = input.int(3, "Fast", group=grp_ck)
-ck_slow = input.int(10, "Slow", group=grp_ck)
+// EMA Settings
+grp_ema = "📈 EMA Settings"
+ema1_len = input.int(50, "EMA Ngắn hạn (Lướt sóng)", group=grp_ema)
+ema2_len = input.int(144, "EMA Trung hạn", group=grp_ema)
+ema3_len = input.int(233, "EMA Dài hạn", group=grp_ema)
 
-grp_vsa = "3. Wyckoff VSA"
-vol_climax_mult = input.float(2.0, "Volume Climax (x TB)", group=grp_vsa)
-vol_dry_mult = input.float(0.5, "Volume Cạn (x TB)", group=grp_vsa)
+// Ichimoku Cloud
+i_showIchimoku = input.bool(true, "Hiện Ichimoku Cloud")
 
-grp_rsi = "4. RSI Divergence"
-rsi_len = input.int(14, "RSI Length", group=grp_rsi)
-pivot_lookback = input.int(5, "Pivot Lookback", group=grp_rsi)
+// RS Rating (IBD Style)
+grp_rs = "📊 RS Rating (IBD)"
+i_showRS = input.bool(false, "Show RS Dashboard", group=grp_rs, tooltip="Hiện bảng RS Rating trên góc chart")
+i_benchmark = input.symbol("VNINDEX", "Benchmark Index", group=grp_rs, tooltip="Chỉ số để so sánh (VNINDEX, VN30, SPX...)")
 
-grp_risk = "5. Quản Lý Vốn"
+// Display
+grp_display = "🎨 Hiển Thị"
+i_showHistogram = input.bool(true, "Hiện 📊 Money Flow Histogram", group=grp_display, tooltip="Histogram thể hiện dòng tiền (xanh=mua, đỏ=bán)")
+i_volSpikeLb = input.bool(true, "Hiện ⚡ Vol Đột biến", group=grp_display, tooltip="Volume cao gấp 2.5x MA20 + Giá biến động mạnh")
+i_volDryLb = input.bool(true, "Hiện 🚦 Vol Cạn kiệt", group=grp_display, tooltip="Volume thấp + Giá đi ngang = Tích lũy")
+i_candleColoring = input.bool(true, "Tô màu nến theo biến động", group=grp_display, tooltip="Nến đậm = biến động mạnh, nến nhạt = biến động yếu")
+i_showOB = input.bool(true, "Hiện 📦 Order Block", group=grp_display, tooltip="Hiển thị vùng Order Block (cản) trên chart")
+
+// Risk Management
+grp_risk = "💰 Quản Lý Vốn"
 sl_pct = input.float(8.0, "Stop Loss %", group=grp_risk)
 tp1_pct = input.float(15.0, "Take Profit 1 % (Chốt 50%)", group=grp_risk)
 use_trailing = input.bool(true, "Dùng Trailing Stop?", group=grp_risk)
 trail_pct = input.float(5.0, "Trailing Stop %", group=grp_risk)
 
-grp_addon = "6. Cảnh Báo Đặc Biệt"
-i_vSpikeLb = input.bool(true, "Hiện 🚦 (Vol Kiệt sức)", group=grp_addon)
-i_vSpikeTh = input.float(0.3, "Ngưỡng Vol Kiệt sức (x TB)", group=grp_addon)
-i_hATRLb = input.bool(true, "Hiện ⚡ (Biến động lỏng lẻo)", group=grp_addon)
-i_atr_mult = input.float(2.718, "Ngưỡng Biến động (x ATR)", group=grp_addon)
+// Internal Settings (Hidden)
+cmf_len = 20
+ck_fast = 3
+ck_slow = 10
+vol_spike_threshold = 2.5
+atr_mult_threshold = 2.0
+ob_lookback = 20
+
+// Ichimoku parameters
+conversionPeriods = 9
+basePeriods = 26
+laggingSpan2Periods = 52
+displacement = 26
+cloudSupportThreshold = 0.003
 
 // ==========================================
 // CALCULATIONS
 // ==========================================
 
-// CMF
+// CMF (Chaikin Money Flow)
 ad_val = close==high and close==low or high==low ? 0 : ((2*close-low-high)/(high-low))*volume
 mf = math.sum(ad_val, cmf_len) / math.sum(volume, cmf_len)
 
-// Chaikin
-ad_line = ta.accdist
-ck_raw = ta.ema(ad_line, ck_fast) - ta.ema(ad_line, ck_slow)
+// Chaikin Oscillator
+ad_line = ta.cum(ad_val)
+ck_fast_ema = ta.ema(ad_line, ck_fast)
+ck_slow_ema = ta.ema(ad_line, ck_slow)
+ck_raw = ck_fast_ema - ck_slow_ema
+
+// Normalize Chaikin for visualization
+price_range = ta.highest(high, 100) - ta.lowest(low, 100)
+scaler = price_range * 0.05
+ck_visual = ck_raw / (scaler != 0 ? scaler : 1)
 
 // EMAs
-ema50 = ta.ema(close, 50)
-ema144 = ta.ema(close, 144)
-ema233 = ta.ema(close, 233)
+ema50 = ta.ema(close, ema1_len)
+ema144 = ta.ema(close, ema2_len)
+ema233 = ta.ema(close, ema3_len)
 
 above_ema50 = close > ema50
 above_ema144 = close > ema144
 above_ema233 = close > ema233
+
+// Trend Detection
 ema_count_above = (above_ema50 ? 1 : 0) + (above_ema144 ? 1 : 0) + (above_ema233 ? 1 : 0)
+is_confirmed_uptrend = ema_count_above >= 2
+is_confirmed_downtrend = ema_count_above == 0
+
+// Ichimoku Cloud
+donchian(len) => math.avg(ta.lowest(len), ta.highest(len))
+conversionLine = donchian(conversionPeriods)
+baseLine = donchian(basePeriods)
+leadLine1 = math.avg(conversionLine, baseLine)
+leadLine2 = donchian(laggingSpan2Periods)
+
+senkou_a = leadLine1[displacement]
+senkou_b = leadLine2[displacement]
+cloudTop = math.max(senkou_a, senkou_b)
+cloudBottom = math.min(senkou_a, senkou_b)
+cloudBullish = senkou_a > senkou_b
+
+distance_to_cloud_support = cloudBullish and close > cloudBottom ? (close - cloudBottom) / close : na
+at_cloud_support = not na(distance_to_cloud_support) and distance_to_cloud_support <= cloudSupportThreshold
+
+distance_to_cloud_resistance = not cloudBullish and close < cloudTop ? (cloudTop - close) / close : na
+at_cloud_resistance = not na(distance_to_cloud_resistance) and distance_to_cloud_resistance <= cloudSupportThreshold
 
 // RSI
-rsi_val = ta.rsi(close, rsi_len)
+rsi_val = ta.rsi(close, 14)
 rsi_overbought = rsi_val > 70
 rsi_oversold = rsi_val < 30
 
-// ==========================================
-// WYCKOFF VSA
-// ==========================================
-
-vol_sma = ta.sma(volume, 20)
-vol_ratio = volume / vol_sma
-
-is_vol_climax = vol_ratio >= vol_climax_mult
-is_vol_high = vol_ratio >= 1.5 and vol_ratio < vol_climax_mult
-is_vol_dry = vol_ratio < vol_dry_mult
-
-atr_val = ta.atr(14)
-spread = high - low
-is_spread_wide = spread > atr_val * 1.5
-
-is_bullish = close > open
-is_bearish = close < open
-close_position = (close - low) / (high - low)
-
-// Volume Kiệt sức & Biến động lỏng lẻo
-is_vol_exhaustion = vol_ratio <= i_vSpikeTh  // 🚦 Volume thấp = Cạn kiệt
-is_high_volatility = spread > atr_val * i_atr_mult  // ⚡
-is_volatility_surge = is_vol_exhaustion or is_high_volatility
-
-// VSA Patterns
-is_spring = low < ema233 and close > ema233 and close > open
-lowest_10 = ta.lowest(low, 10)
-is_shakeout = low < lowest_10[1] and is_vol_dry and close_position > 0.5 and is_bullish
-accumulation_sign = is_vol_climax and is_bearish and close_position > 0.6
-hidden_distribution = is_vol_climax and is_bullish and close_position < 0.4
-highest_10 = ta.highest(high, 10)
-is_upthrust = high > highest_10[1] and close < open and close_position < 0.5
-easy_move_up = is_vol_dry and is_bullish and is_spread_wide
+// Volume Analysis
+vol_ma20 = ta.sma(volume, 20)
+vol_spike = volume > vol_ma20 * vol_spike_threshold
 
 // ==========================================
-// RSI DIVERGENCE
+// RS RATING (IBD STYLE) - CALCULATION
 // ==========================================
 
-price_pivot_low = ta.pivotlow(low, pivot_lookback, pivot_lookback)
-rsi_pivot_low = ta.pivotlow(rsi_val, pivot_lookback, pivot_lookback)
-price_pivot_high = ta.pivothigh(high, pivot_lookback, pivot_lookback)
-rsi_pivot_high = ta.pivothigh(rsi_val, pivot_lookback, pivot_lookback)
+benchmarkClose = request.security(i_benchmark, timeframe.period, close)
 
-var float prev_price_low = na
-var float prev_rsi_low = na
-var float prev_price_high = na
-var float prev_rsi_high = na
+calcPerformance(lookback) =>
+    if bar_index >= lookback
+        currentPrice = close
+        pastPrice = close[lookback]
+        pastPrice != 0 ? ((currentPrice - pastPrice) / pastPrice) * 100 : 0
+    else
+        0
 
-// Hidden Bullish: Price HL + RSI LL
-hidden_bullish = false
-if not na(price_pivot_low) and not na(prev_price_low)
-    price_hl = low[pivot_lookback] > prev_price_low
-    rsi_ll = rsi_val[pivot_lookback] < prev_rsi_low
-    if price_hl and rsi_ll and rsi_val[pivot_lookback] < 50
-        hidden_bullish := true
+calcBenchmarkPerf(lookback) =>
+    if bar_index >= lookback
+        currentBench = benchmarkClose
+        pastBench = benchmarkClose[lookback]
+        pastBench != 0 ? ((currentBench - pastBench) / pastBench) * 100 : 0
+    else
+        0
 
-// Regular Bullish: Price LL + RSI HL
-regular_bullish = false
-if not na(price_pivot_low) and not na(prev_price_low)
-    price_ll = low[pivot_lookback] < prev_price_low
-    rsi_hl = rsi_val[pivot_lookback] > prev_rsi_low
-    if price_ll and rsi_hl and rsi_val[pivot_lookback] < 40
-        regular_bullish := true
+perf_3m_stock = calcPerformance(63)
+perf_6m_stock = calcPerformance(126)
+perf_9m_stock = calcPerformance(189)
+perf_12m_stock = calcPerformance(252)
 
-// Bearish: Price HH + RSI LH
-regular_bearish = false
-if not na(price_pivot_high) and not na(prev_price_high)
-    price_hh = high[pivot_lookback] > prev_price_high
-    rsi_lh = rsi_val[pivot_lookback] < prev_rsi_high
-    if price_hh and rsi_lh and rsi_val[pivot_lookback] > 60
-        regular_bearish := true
+perf_3m_bench = calcBenchmarkPerf(63)
+perf_6m_bench = calcBenchmarkPerf(126)
+perf_9m_bench = calcBenchmarkPerf(189)
+perf_12m_bench = calcBenchmarkPerf(252)
 
-if not na(price_pivot_low)
-    prev_price_low := low[pivot_lookback]
-    prev_rsi_low := rsi_val[pivot_lookback]
+stock_score = (perf_3m_stock * 0.4) + (perf_6m_stock * 0.2) + (perf_9m_stock * 0.2) + (perf_12m_stock * 0.2)
+market_score = (perf_3m_bench * 0.4) + (perf_6m_bench * 0.2) + (perf_9m_bench * 0.2) + (perf_12m_bench * 0.2)
 
-if not na(price_pivot_high)
-    prev_price_high := high[pivot_lookback]
-    prev_rsi_high := rsi_val[pivot_lookback]
+rs_diff = stock_score - market_score
+rs_raw = 50 + (rs_diff * 0.8)
+rs_rating = rs_raw > 99 ? 99 : rs_raw < 1 ? 1 : math.round(rs_raw)
 
 // ==========================================
-// SIGNALS
+// MONEY FLOW SIGNALS
 // ==========================================
 
-is_slope_up = mf > mf[1]
-cmf_recovering = mf < 0 and mf > mf[1] and mf[1] > mf[2]
-ck_positive = ck_raw > 0
-rsi_ok = rsi_val > 40 and rsi_val < 75
+// Dòng tiền vào mạnh
+mf_count_positive = 0
+for i = 0 to 2
+    if mf[i] > 0.05
+        mf_count_positive += 1
 
-// Buy conditions
-cond_trend_ok = ema_count_above >= 2
-cond_cmf_ok = mf > 0 and is_slope_up
-cond_vsa_bullish = accumulation_sign or is_spring or is_shakeout or easy_move_up
+is_critical_inflow = mf_count_positive >= 3
+is_strong_inflow = mf > 0.05
+is_light_inflow = mf > 0 and mf <= 0.05
 
-buy_signal = cond_trend_ok and cond_cmf_ok and rsi_ok and ck_positive
-strong_buy = (buy_signal and cond_vsa_bullish) or hidden_bullish[pivot_lookback]
-buy_early = ((is_spring or is_shakeout or accumulation_sign) and cmf_recovering) or regular_bullish[pivot_lookback]
+// Dòng tiền ra mạnh
+mf_count_negative = 0
+for i = 0 to 2
+    if mf[i] < -0.05
+        mf_count_negative += 1
 
-// Exit conditions
-cond_cmf_weak = mf < 0 and mf < mf[1] and mf[1] < mf[2]
-cond_ema_weak = ema_count_above <= 1
-cond_vsa_bearish = hidden_distribution or is_upthrust
-death_cross = ta.crossunder(ema50, ema144)
+is_critical_outflow = mf_count_negative >= 3
+is_strong_outflow = mf < -0.05
 
-exit_signal = (cond_cmf_weak and cond_ema_weak) or cond_vsa_bearish or regular_bearish[pivot_lookback] or death_cross
+// Market choppy
+is_choppy_market = math.abs(mf) < 0.02 and not vol_spike
+
+// ==========================================
+// STRATEGY SIGNALS
+// ==========================================
+
+// BUY CONDITIONS (Require above_ema50 for ALL signals - NO EXCEPTION)
+strong_buy_condition = is_critical_inflow and is_confirmed_uptrend and above_ema50
+buy_condition = is_strong_inflow and above_ema50 and above_ema233
+early_buy_condition = is_light_inflow and above_ema50 and above_ema233 and rsi_oversold and at_cloud_support
+
+// SELL CONDITIONS
+strong_sell_condition = is_critical_outflow
+sell_condition = is_strong_outflow or (not above_ema50 and is_confirmed_downtrend)
 
 // ==========================================
 // STRATEGY EXECUTION
 // ==========================================
 
 if strategy.position_size == 0
-    if strong_buy
-        strategy.entry("Long", strategy.long, comment="💎 MẠNH")
-    else if buy_signal
+    if strong_buy_condition
+        strategy.entry("Long", strategy.long, comment="💎 MUA MẠNH")
+    else if buy_condition
         strategy.entry("Long", strategy.long, comment="✅ MUA")
-    else if buy_early
+    else if early_buy_condition
         strategy.entry("Long", strategy.long, comment="⚡ SỚM")
 
+// Exit Logic - Trailing chỉ khi lãi > 15%
 if strategy.position_size > 0
+    // Tính % lãi hiện tại
+    current_profit_pct = (close - strategy.position_avg_price) / strategy.position_avg_price * 100
+    
+    // Stop Loss cố định
     stop_price = strategy.position_avg_price * (1 - sl_pct/100)
-    tp1_price = strategy.position_avg_price * (1 + tp1_pct/100)
     
-    strategy.exit("TP1", qty_percent=50, limit=tp1_price, stop=stop_price, comment="Chốt 50%")
-    
-    if use_trailing
+    // Chỉ bật trailing khi lãi >= 15%
+    if current_profit_pct >= tp1_pct and use_trailing
+        // Trailing Stop (5% từ đỉnh)
         trail_points = close * trail_pct / 100 / syminfo.mintick
-        strategy.exit("Trail", qty_percent=100, trail_points=trail_points, trail_offset=trail_points, stop=stop_price)
+        strategy.exit("Trail", from_entry="Long", 
+                     trail_points=trail_points, trail_offset=trail_points, 
+                     stop=stop_price, comment="Trailing")
+    else
+        // Chưa đủ lãi 15% → Chỉ SL cố định
+        strategy.exit("SL", from_entry="Long", stop=stop_price, comment="Stop Loss")
 
-if strategy.position_size > 0 and exit_signal
-    strategy.close_all(comment="Thoát")
+// Exit khi có sell signal mạnh
+if strategy.position_size > 0 and (strong_sell_condition or sell_condition)
+    strategy.close_all(comment="BÁN")
 
 // ==========================================
 // VISUALIZATION
 // ==========================================
 
-// Candle coloring
-candle_color = is_volatility_surge and is_bullish ? color.new(color.yellow, 0) :
-               is_volatility_surge and is_bearish ? color.new(color.fuchsia, 0) :
-               is_vol_climax and is_bullish and close_position > 0.6 ? color.yellow :
-               is_vol_climax and is_bearish and close_position > 0.6 ? color.aqua :
-               is_vol_high and is_bullish ? color.teal :
-               is_vol_high and is_bearish ? color.maroon :
-               is_vol_dry ? color.gray :
-               is_bullish ? color.green : color.red
+// Histogram
+hline(0, "Zero", color.gray, hline.style_dotted)
+plot(i_showHistogram ? mf : na, "CMF", style=plot.style_columns, color=mf > 0 ? color.new(color.teal, 40) : color.new(color.red, 40), linewidth=5)
+plot(i_showHistogram ? ck_visual : na, "Chaikin", color=color.orange, linewidth=3)
+
+// EMAs (Overlay)
+plot(ema50, "EMA 50", color=above_ema50 ? color.lime : color.red, linewidth=2, force_overlay=true)
+plot(ema144, "EMA 144", color=above_ema144 ? color.lime : color.red, linewidth=3, force_overlay=true)
+plot(ema233, "EMA 233", color=above_ema233 ? color.lime : color.red, linewidth=4, force_overlay=true)
+
+// Ichimoku Cloud
+p1 = plot(i_showIchimoku ? senkou_a : na, "Senkou A", color=color.new(color.green, 50), force_overlay=true)
+p2 = plot(i_showIchimoku ? senkou_b : na, "Senkou B", color=color.new(color.red, 50), force_overlay=true)
+fill(p1, p2, color=i_showIchimoku ? (cloudBullish ? color.new(color.green, 85) : color.new(color.red, 85)) : na)
+
+// Volume Signals
+plotshape(i_volSpikeLb and vol_spike, "⚡ Vol Spike", shape.diamond, location.abovebar, color.yellow, text="⚡", size=size.tiny, force_overlay=true)
+plotshape(i_volDryLb and volume < vol_ma20 * 0.5, "🚦 Vol Dry", shape.circle, location.belowbar, color.lime, text="🚦", size=size.tiny, force_overlay=true)
+
+// Candle Coloring
+candle_color = i_candleColoring ? 
+               (vol_spike and close > open ? color.new(color.yellow, 0) :
+                vol_spike and close < open ? color.new(color.fuchsia, 0) :
+                close > open ? color.green : color.red) : na
 barcolor(candle_color)
 
-// EMAs
-plot(ema50, "EMA 50", color=above_ema50 ? color.lime : color.red, linewidth=2)
-plot(ema144, "EMA 144", color=above_ema144 ? color.lime : color.red, linewidth=3)
-plot(ema233, "EMA 233", color=above_ema233 ? color.lime : color.red, linewidth=4)
-
-// VSA Icons - 🚦 và ⚡
-plotshape(i_vSpikeLb and is_vol_exhaustion, "🚦 Vol Kiệt sức", shape.circle, location.belowbar, color.lime, text="🚦", size=size.small)
-plotshape(i_hATRLb and is_high_volatility, "⚡ Biến động", shape.diamond, location.abovebar, color.yellow, text="⚡", size=size.small)
-plotshape(is_spring or is_shakeout, "Spring", shape.diamond, location.belowbar, color.aqua, size=size.small)
-plotshape(accumulation_sign, "Accum", shape.triangleup, location.belowbar, color.lime, size=size.tiny)
-plotshape(hidden_distribution, "Dist", shape.triangledown, location.abovebar, color.orange, size=size.tiny)
-
-// RSI Divergence Icons
-plotshape(hidden_bullish[pivot_lookback], "Hidden Bullish", shape.labelup, location.belowbar, color.blue, text="HD", size=size.small)
-plotshape(regular_bullish[pivot_lookback], "Regular Bullish", shape.labelup, location.belowbar, color.purple, text="RD", size=size.small)
-plotshape(regular_bearish[pivot_lookback], "Bearish Div", shape.labeldown, location.abovebar, color.red, text="BD", size=size.small)
-
-// Background
+// Background for position
 bgcolor(strategy.position_size > 0 ? color.new(color.green, 90) : na)
 
 // ==========================================
 // DASHBOARD
 // ==========================================
-var table panel = table.new(position.top_right, 2, 7, border_width=1)
+var table panel = table.new(position.top_right, 2, i_showRS ? 8 : 7, border_width=1, force_overlay=true)
 if barstate.islast
-    table.cell(panel, 0, 0, "🐋 VSA+RSI", bgcolor=color.black, text_color=color.white)
+    table.cell(panel, 0, 0, "🐋 TRINITY", bgcolor=color.black, text_color=color.white)
     table.cell(panel, 1, 0, "BY VINH", bgcolor=color.black, text_color=color.yellow)
     
-    table.cell(panel, 0, 1, "Vị thế:", bgcolor=color.white, text_halign=text.align_left)
-    table.cell(panel, 1, 1, strategy.position_size > 0 ? "GIỮ 📈" : "---", text_color=strategy.position_size > 0 ? color.green : color.gray)
+    // Money Flow
+    table.cell(panel, 0, 1, "Dòng tiền:", bgcolor=color.white, text_halign=text.align_left)
+    mf_text = is_critical_inflow ? "VÀO MẠNH ✅" : 
+              is_strong_inflow ? "VÀO 👍" : 
+              is_critical_outflow ? "RA MẠNH ❌" :
+              is_strong_outflow ? "RA ⚠️" : "TRUNG TÍNH"
+    mf_color = is_critical_inflow or is_strong_inflow ? color.green : 
+               is_critical_outflow or is_strong_outflow ? color.red : color.gray
+    table.cell(panel, 1, 1, mf_text, text_color=mf_color)
     
-    table.cell(panel, 0, 2, "RSI:", bgcolor=color.white, text_halign=text.align_left)
-    rsi_text = rsi_overbought ? "OB ⚠️" : rsi_oversold ? "OS 💡" : str.tostring(rsi_val, "#")
-    table.cell(panel, 1, 2, rsi_text, text_color=rsi_overbought ? color.red : rsi_oversold ? color.green : color.blue)
+    // Trend
+    table.cell(panel, 0, 2, "Trung hạn:", bgcolor=color.white, text_halign=text.align_left)
+    trend_text = is_confirmed_uptrend ? "UPTREND ✅" : is_confirmed_downtrend ? "DOWNTREND ❌" : "SIDEWAY"
+    trend_color = is_confirmed_uptrend ? color.green : is_confirmed_downtrend ? color.red : color.orange
+    table.cell(panel, 1, 2, trend_text, text_color=trend_color)
     
-    table.cell(panel, 0, 3, "Phân kỳ:", bgcolor=color.white, text_halign=text.align_left)
-    div_text = hidden_bullish ? "HD 🔵" : regular_bullish ? "RD 🟣" : regular_bearish ? "BD 🔴" : "---"
-    table.cell(panel, 1, 3, div_text, text_color=hidden_bullish or regular_bullish ? color.green : regular_bearish ? color.red : color.gray)
+    // Surfing
+    table.cell(panel, 0, 3, "Lướt sóng:", bgcolor=color.white, text_halign=text.align_left)
+    surf_text = above_ema50 ? "OK ✅" : "DƯỚI ❌"
+    surf_color = above_ema50 ? color.green : color.red
+    table.cell(panel, 1, 3, surf_text, text_color=surf_color)
     
+    // Position
+    table.cell(panel, 0, 4, "Vị thế:", bgcolor=color.white, text_halign=text.align_left)
+    pos_text = strategy.position_size > 0 ? "GIỮ 📈" : "NGOÀI"
+    pos_color = strategy.position_size > 0 ? color.green : color.gray
+    table.cell(panel, 1, 4, pos_text, text_color=pos_color)
+    
+    // Win Rate
     total = strategy.wintrades + strategy.losstrades
     wr = total > 0 ? strategy.wintrades / total * 100 : 0
-    table.cell(panel, 0, 4, "Win:", bgcolor=color.white, text_halign=text.align_left)
-    table.cell(panel, 1, 4, str.tostring(wr, "#.#") + "%", text_color=wr > 50 ? color.green : color.red)
+    table.cell(panel, 0, 5, "Win Rate:", bgcolor=color.white, text_halign=text.align_left)
+    table.cell(panel, 1, 5, str.tostring(wr, "#.#") + "%", text_color=wr > 50 ? color.green : color.red)
     
-    table.cell(panel, 0, 5, "Trades:", bgcolor=color.white, text_halign=text.align_left)
-    table.cell(panel, 1, 5, str.tostring(strategy.closedtrades), text_color=color.blue)
-    
+    // P&L
     pnl = strategy.netprofit / strategy.initial_capital * 100
     table.cell(panel, 0, 6, "P&L:", bgcolor=color.white, text_halign=text.align_left)
     table.cell(panel, 1, 6, str.tostring(pnl, "#.#") + "%", text_color=pnl > 0 ? color.green : color.red)
+    
+    // RS Rating (Optional)
+    if i_showRS
+        table.cell(panel, 0, 7, "📊 RS:", bgcolor=color.white, text_halign=text.align_left)
+        rs_category = rs_rating > 80 ? "LEADER" : rs_rating >= 60 ? "AVERAGE" : "WEAK"
+        rs_color = rs_rating > 80 ? color.green : rs_rating >= 60 ? color.orange : color.red
+        rs_display = str.tostring(rs_rating) + " (" + rs_category + ")"
+        table.cell(panel, 1, 7, rs_display, text_color=rs_color)
