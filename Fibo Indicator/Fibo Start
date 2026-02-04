@@ -3,7 +3,7 @@
 // Fibonacci Pivot Points - 13 Fibonacci Levels
 // Features: Custom ratios, line styles, auto timeframe, labels with prices
 // ═══════════════════════════════════════════════════════════════════════════════
-indicator("Fibo Pivots", "FIB", overlay=true, max_lines_count=500, max_labels_count=500, format=format.inherit)
+indicator("Fibo Pivots", "F", overlay=true, max_lines_count=500, max_labels_count=500, format=format.inherit)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN SETTINGS

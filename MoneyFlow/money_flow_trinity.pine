@@ -1,17 +1,35 @@
-//@version=5
+//@version=6
 // Coder Stock - Money Flow Trinity Master (Wyckoff VSA + RSI Divergence)
 // Tích hợp: CMF + Chaikin + EOM + Wyckoff VSA + RSI Divergence
 // Features: Candle Coloring, Volume Climax, Shakeout, RSI Divergence, Volatility Alert
 // Author: Vinh
-indicator(title="CS Trinity Master VSA", shorttitle="CS_Trinity_VSA", format=format.price, precision=2, max_lines_count=100)
+indicator(title="CS Trinity Master VSA", shorttitle="CS Trinity", format=format.price, precision=2, max_lines_count=100)
 
 // ==========================================
 // 1. CẤU HÌNH NGƯỜI DÙNG
 // ==========================================
-grp_ema = "📈 EMA Settings"
+grp_ema = "� EMA Settings"
 ema1_len = input.int(50, "EMA Ngắn hạn (Lướt sóng)", group=grp_ema)
 ema2_len = input.int(144, "EMA Trung hạn", group=grp_ema)
 ema3_len = input.int(233, "EMA Dài hạn", group=grp_ema)
+
+// ☁️ Ichimoku Cloud - Chỉ hiển thị checkbox bật/tắt
+i_showIchimoku = input.bool(true, "Hiện Ichimoku Cloud")
+
+// Ichimoku parameters (hardcoded - ẩn khỏi settings)
+conversionPeriods = 9      // Tenkan-sen
+basePeriods = 26          // Kijun-sen  
+laggingSpan2Periods = 52  // Senkou Span B
+displacement = 26         // Chikou Span
+cloudSupportThreshold = 0.003  // 0.3% threshold
+
+
+
+
+
+// 📊 RS RATING (IBD Style)
+i_showRS = input.bool(true, "Hiện RS Rating (IBD)")
+i_benchmark = input.symbol("VNINDEX", "Benchmark Index", tooltip="Mã chỉ số để so sánh (VNINDEX, VN30, hoặc SPX)")
 
 grp_display = "🎨 Hiển Thị"
 i_volSpikeLb = input.bool(true, "Hiện ⚡ Vol Đột biến", group=grp_display, tooltip="Volume cao gấp 2.5x MA20 + Giá biến động mạnh")
@@ -67,6 +85,46 @@ above_ema144 = close > ema144
 above_ema233 = close > ema233
 ema_count_above = (above_ema50 ? 1 : 0) + (above_ema144 ? 1 : 0) + (above_ema233 ? 1 : 0)
 resistance_count = 3 - ema_count_above
+
+// --- ICHIMOKU CLOUD CALCULATIONS ---
+donchian(len) => math.avg(ta.lowest(len), ta.highest(len))
+conversionLine = donchian(conversionPeriods)  // Tenkan-sen
+baseLine = donchian(basePeriods)  // Kijun-sen
+leadLine1 = math.avg(conversionLine, baseLine)  // Senkou Span A
+leadLine2 = donchian(laggingSpan2Periods)  // Senkou Span B
+chikou = close  // Lagging Span (offset in plot)
+
+// Shifted cloud for current bar (future cloud)
+cloudTop = math.max(leadLine1, leadLine2)
+cloudBottom = math.min(leadLine1, leadLine2)
+cloudBullish = leadLine1 > leadLine2  // Green cloud when Span A > Span B
+
+// Cloud Position Detection
+getCloudPosition(price, cloudTop, cloudBottom) =>
+    distToTop = math.abs(price - cloudTop) / cloudTop
+    distToBottom = math.abs(price - cloudBottom) / cloudBottom
+    
+    position = "IN_CLOUD"
+    if price > cloudTop * (1 + cloudSupportThreshold)
+        position := "ABOVE_CLOUD"
+    else if price < cloudBottom * (1 - cloudSupportThreshold)
+        position := "BELOW_CLOUD"
+    else if distToTop < cloudSupportThreshold and price >= cloudTop
+        position := "AT_SUPPORT"  // Touching top from above
+    else if distToBottom < cloudSupportThreshold and price <= cloudBottom
+        position := "AT_RESISTANCE"  // Touching bottom from below
+    position
+
+cloudPosition = getCloudPosition(close, cloudTop, cloudBottom)
+at_cloud_support = cloudPosition == "AT_SUPPORT"
+at_cloud_resistance = cloudPosition == "AT_RESISTANCE"
+above_cloud = cloudPosition == "ABOVE_CLOUD"
+below_cloud = cloudPosition == "BELOW_CLOUD"
+in_cloud = cloudPosition == "IN_CLOUD"
+
+// Tenkan/Kijun Cross (TK Cross)
+tk_bullish_cross = ta.crossover(conversionLine, baseLine)
+tk_bearish_cross = ta.crossunder(conversionLine, baseLine)
 
 // Đếm số nến liên tiếp trên/dưới EMA233 để xác nhận xu hướng
 var int candles_above_ema233 = 0
@@ -431,6 +489,15 @@ plot(ema50, "EMA 50", color=above_ema50 ? color.lime : color.red, linewidth=2, f
 plot(ema144, "EMA 144", color=above_ema144 ? color.lime : color.red, linewidth=3, force_overlay=true)
 plot(ema233, "EMA 233", color=above_ema233 ? color.lime : color.red, linewidth=4, force_overlay=true)
 
+// ICHIMOKU CLOUD (Overlay) - Chỉ hiển thị mây (không hiện các đường)
+// V6: Không dùng plot trong if block, dùng display conditional
+p1 = plot(i_showIchimoku ? leadLine1 : na, title="Senkou Span A", offset=displacement-1, color=color.new(color.gray, 100), linewidth=1, force_overlay=true, display=display.none)
+p2 = plot(i_showIchimoku ? leadLine2 : na, title="Senkou Span B", offset=displacement-1, color=color.new(color.gray, 100), linewidth=1, force_overlay=true, display=display.none)
+
+// Cloud Fill - Mây xanh (bullish) hoặc đỏ (bearish)
+cloudColor = leadLine1 > leadLine2 ? color.new(color.green, 85) : color.new(color.red, 85)
+fill(p1, p2, color=i_showIchimoku ? cloudColor : na, title="Ichimoku Cloud")
+
 // ==========================================
 // 7. CẢNH BÁO (CHỈ ICONS QUAN TRỌNG)
 // ==========================================
@@ -440,6 +507,10 @@ plotshape(i_volSpikeLb and is_vol_spike, "⚡ Vol Đột biến", shape.diamond,
 
 // 🚦 VOLUME KIỆT - Volume thấp = Hết người bán = Tích cực  
 plotshape(i_volDryLb and is_vol_exhaustion, "🚦 Vol Kiệt", shape.circle, location.belowbar, color.lime, text="🚦", size=size.tiny, force_overlay=true)
+
+// ☁️ ICHIMOKU CLOUD MARKERS
+plotshape(at_cloud_support and cloudBullish and i_showIchimoku, "☁️ Cloud Support", shape.circle, location.belowbar, color.new(color.green, 30), text="☁️", size=size.tiny, force_overlay=true)
+plotshape(at_cloud_resistance and not cloudBullish and i_showIchimoku, "☁️ Cloud Resistance", shape.circle, location.abovebar, color.new(color.red, 30), text="☁️", size=size.tiny, force_overlay=true)
 
 // ==========================================
 // 8. TÍN HIỆU MUA/BÁN
@@ -488,10 +559,15 @@ cond_vsa_ok = accumulation_sign or is_spring or is_shakeout or easy_move_up
 cond_cooldown_buy = bars_since_buy >= buy_cooldown
 
 // MUA AN TOÀN (MÚC) - CHỈ KHI HISTOGRAM XANH (UPTREND)
+// + KẼt hợp với Ichimoku Cloud Support
 // Tránh tín hiệu khi chỉ là hồi kỹ thuật yếu
 histogram_green = mf > 0  // Histogram phải XANH (dòng tiền đã vào)
 histogram_sufficient = mf > 0.03  // Histogram phải đủ mạnh, không quá yếu
 no_rsi_divergence = not regular_bullish[pivot_lookback] and not hidden_bullish[pivot_lookback]  // Không có phân kỳ RSI
+
+// Ichimoku Cloud Enhancement: Mua khi giá chạm hỗ trợ mây + mây xanh
+cloud_support_boost = at_cloud_support and cloudBullish  // Giá chạm hỗ trợ mây xanh
+tk_bullish = conversionLine > baseLine  // Tenkan trên Kijun = đà tăng
 
 buy_safe = cond_cmf_ok and cond_ema_ok and ck_cross_up and cond_cooldown_buy and not is_histogram_green_weakening and histogram_green and histogram_sufficient and no_rsi_divergence
 
@@ -500,11 +576,15 @@ buy_safe = cond_cmf_ok and cond_ema_ok and ck_cross_up and cond_cooldown_buy and
 // 1. Histogram xanh MẠNH (> 0.05 và đang tăng)
 // 2. Chaikin đang cắt XUỐNG (không được ở cao) - tức đã qua đỉnh
 // 3. VSA tích cực HOẶC RSI divergence
+// 4. ☁️ ICHIMOKU: Giá tại hỗ trợ mây xanh + TK Bullish
 histogram_strong = mf > 0.05 and is_histogram_strengthening
 chaikin_cutting_down = ck_raw < ck_raw[1] and ck_raw[1] < ck_raw[2]  // Đang giảm 2 phiên
 chaikin_not_high = ck_raw < 0.5 * ta.highest(ck_raw, 20)  // Không ở 50% đỉnh gần nhất
 
-super_buy = ((buy_safe and cond_vsa_ok and histogram_strong and (chaikin_cutting_down or chaikin_not_high)) or hidden_bullish[pivot_lookback]) and histogram_strong
+// Cloud Super Buy: Mây xanh + Giá tại hỗ trợ + TK/Kijun bullish
+cloud_super_buy = at_cloud_support and cloudBullish and tk_bullish
+
+super_buy = ((buy_safe and cond_vsa_ok and histogram_strong and (chaikin_cutting_down or chaikin_not_high)) or hidden_bullish[pivot_lookback] or cloud_super_buy) and histogram_strong
 
 if buy_safe or super_buy
     bars_since_buy := 0
@@ -519,12 +599,16 @@ if buy_early
     bars_since_buy := 0
 
 // BÁN - CHỈ KHI HISTOGRAM ĐỎ KHÔNG YẾU DẦN
+// + ☁️ ICHIMOKU: Giá tại kháng cự mây đỏ
 cond_cmf_weak = mf < 0 and mf < mf[1]
 cond_ema_weak = ema_count_above <= 1
 cond_vsa_sell = hidden_distribution or is_upthrust
 cond_cooldown_sell = bars_since_sell >= sell_cooldown
 
-sell_sig = ((cond_cmf_weak and ck_cross_down) or cond_vsa_sell or regular_bearish[pivot_lookback]) and cond_ema_weak and cond_cooldown_sell and not is_histogram_red_weakening
+// Cloud Resistance Sell: Mây đỏ + Giá tại kháng cự + TK/Kijun bearish
+cloud_resistance_sell = at_cloud_resistance and not cloudBullish and not tk_bullish
+
+sell_sig = ((cond_cmf_weak and ck_cross_down) or cond_vsa_sell or regular_bearish[pivot_lookback] or cloud_resistance_sell) and cond_ema_weak and cond_cooldown_sell and not is_histogram_red_weakening
 
 if sell_sig
     bars_since_sell := 0
@@ -583,11 +667,68 @@ plotshape(regular_bullish_d, "Daily Bull Div", shape.diamond, location.bottom, c
 plotshape(regular_bearish_d, "Daily Bear Div", shape.diamond, location.top, color.fuchsia, text="D-PK-", size=size.small)
 
 // ==========================================
+// 📊 RS RATING (IBD STYLE) - TÍNH TOÁN
+// ==========================================
+
+// Lấy dữ liệu giá đóng cửa của Benchmark
+benchmarkClose = request.security(i_benchmark, timeframe.period, close)
+
+// Hàm tính % thay đổi giá
+calcPerformance(lookback) =>
+    if bar_index >= lookback
+        currentPrice = close
+        pastPrice = close[lookback]
+        pastPrice != 0 ? ((currentPrice - pastPrice) / pastPrice) * 100 : 0
+    else
+        0
+
+calcBenchmarkPerf(lookback) =>
+    if bar_index >= lookback
+        currentBench = benchmarkClose
+        pastBench = benchmarkClose[lookback]
+        pastBench != 0 ? ((currentBench - pastBench) / pastBench) * 100 : 0
+    else
+        0
+
+// Tính hiệu suất theo các khoảng thời gian (IBD Weighted)
+perf_3m_stock = calcPerformance(63)    // 3 tháng (63 phiên)
+perf_6m_stock = calcPerformance(126)   // 6 tháng
+perf_9m_stock = calcPerformance(189)   // 9 tháng
+perf_12m_stock = calcPerformance(252)  // 1 năm
+
+perf_3m_bench = calcBenchmarkPerf(63)
+perf_6m_bench = calcBenchmarkPerf(126)
+perf_9m_bench = calcBenchmarkPerf(189)
+perf_12m_bench = calcBenchmarkPerf(252)
+
+// Trọng số IBD: 3m=40%, 6m=20%, 9m=20%, 12m=20%
+weight_3m = 0.40
+weight_6m = 0.20
+weight_9m = 0.20
+weight_12m = 0.20
+
+// Tính điểm trọng số
+stock_weighted = (perf_3m_stock * weight_3m) + (perf_6m_stock * weight_6m) + 
+                 (perf_9m_stock * weight_9m) + (perf_12m_stock * weight_12m)
+
+bench_weighted = (perf_3m_bench * weight_3m) + (perf_6m_bench * weight_6m) + 
+                 (perf_9m_bench * weight_9m) + (perf_12m_bench * weight_12m)
+
+// Tính RS Score (Relative Strength)
+rs_diff = stock_weighted - bench_weighted
+
+// Normalize về thang 1-99 (50 là trung bình thị trường)
+rs_raw = 50 + (rs_diff * 0.8)
+
+// Giới hạn 1-99
+rs_rating = rs_raw > 99 ? 99 : rs_raw < 1 ? 1 : math.round(rs_raw)
+
+// ==========================================
 // 10. DASHBOARD (ĐƠN GIẢN)
 // ==========================================
-var table panel = table.new(position.top_right, 2, 6, border_width=1, force_overlay=true)
+var table panel = table.new(position.top_right, 2, 7, border_width=1, force_overlay=true)
 if barstate.islast
-    table.cell(panel, 0, 0, "� TRINITY", bgcolor=color.black, text_color=color.white)
+    table.cell(panel, 0, 0, "🔱 TRINITY", bgcolor=color.black, text_color=color.white)
     table.cell(panel, 1, 0, "BY VINH", bgcolor=color.black, text_color=color.yellow)
     
     // Dòng tiền
@@ -603,15 +744,37 @@ if barstate.islast
     
     // Lướt sóng (EMA50)
     table.cell(panel, 0, 3, "Lướt sóng:", bgcolor=color.white, text_halign=text.align_left)
-    table.cell(panel, 1, 3, above_ema50 ? "OK ✅" : "DƯỚI ❌", text_color=above_ema50 ? color.green : color.red)
+    table.cell(panel, 1, 3, above_ema50 ? "OK ✅" : "DƯỚI ❌",text_color=above_ema50 ? color.green : color.red)
     
-    // Cản trên (Order Block based)
+    // Cản trên (Order Block + Cloud Resistance)
     table.cell(panel, 0, 4, "Cản trên:", bgcolor=color.white, text_halign=text.align_left)
-    res_text = ob_resistance_count == 0 ? "KHÔNG CÓ 🆓" : ob_resistance_count == 1 ? "1 OB ⚠️" : ob_resistance_count >= 2 ? str.tostring(ob_resistance_count) + " OB ❌" : "CẢN MẠNH ❌"
-    res_color = ob_resistance_count == 0 ? color.green : ob_resistance_count == 1 ? color.orange : color.red
+    
+    // Tích hợp cloud resistance vào chỉ báo cản trên
+    has_cloud_resistance = at_cloud_resistance and not cloudBullish
+    
+    // Khai báo biến trước để tránh lỗi scope
+    res_text = ""
+    res_color = color.gray
+    
+    if ob_resistance_count == 0 and not has_cloud_resistance
+        res_text := "KHÔNG CÓ 🆓"
+        res_color := color.green
+    else if ob_resistance_count == 0 and has_cloud_resistance
+        res_text := "☁️ CLOUD ⚠️"
+        res_color := color.orange
+    else if ob_resistance_count == 1 and not has_cloud_resistance
+        res_text := "1 OB ⚠️"
+        res_color := color.orange
+    else if ob_resistance_count == 1 and has_cloud_resistance
+        res_text := "OB+☁️ ❌"
+        res_color := color.red
+    else
+        res_text := str.tostring(ob_resistance_count) + " OB" + (has_cloud_resistance ? "+☁️" : "") + " ❌"
+        res_color := color.red
+    
     table.cell(panel, 1, 4, res_text, text_color=res_color)
     
-    // Gợi ý (Recommendation) - Cải thiện logic với mua/bán 1 phần
+    // Gợi ý (Recommendation) - Tích hợp cloud support vào logic
     table.cell(panel, 0, 5, "GỢI Ý:", bgcolor=color.gray, text_halign=text.align_left, text_color=color.white)
     
     // Logic gợi ý chi tiết hơn
@@ -650,15 +813,36 @@ if barstate.islast
     else if rsi_overbought
         rec_text := "CẨN THẬN ⚠️"
         rec_bg := color.orange
-    // CƠ HỘI MUA chỉ khi: dòng tiền vào nhẹ lại + RSI divergence
+    // CƠ HỘI MUA: dòng tiền vào nhẹ lại + RSI divergence + ☁️ Cloud support boost
     else if rsi_oversold and (regular_bullish or hidden_bullish) and mf > 0 and not is_confirmed_downtrend
-        rec_text := "CƠ HỘI MUA 🎯"
-        rec_bg := color.teal
+        if at_cloud_support and cloudBullish
+            rec_text := "CƠ HỘI MUA ☁️🎯"
+            rec_bg := color.teal
+        else
+            rec_text := "CƠ HỘI MUA 🎯"
+            rec_bg := color.teal
     else
         rec_text := "QUAN SÁT 👀"
         rec_bg := color.gray
     
     table.cell(panel, 1, 5, rec_text, bgcolor=rec_bg, text_color=color.white)
+    
+    // 📊 RS RATING (IBD) - ROW 6
+    if i_showRS
+        table.cell(panel, 0, 6, "📊 RS:", bgcolor=color.white, text_halign=text.align_left)
+        
+        // Màu sắc RS Rating
+        rs_color = rs_rating > 90 ? #9C27B0 : 
+                   rs_rating >= 80 ? color.new(color.lime, 0) : 
+                   rs_rating >= 60 ? color.orange : 
+                   color.red
+        
+        rs_display = str.tostring(rs_rating) + " " + 
+                     (rs_rating > 90 ? "🔥" : 
+                      rs_rating >= 80 ? "💪" : 
+                      rs_rating >= 60 ? "⚠️" : "📉")
+        
+        table.cell(panel, 1, 6, rs_display, text_color=rs_color)
 
 // ==========================================
 // ALERTS

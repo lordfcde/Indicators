@@ -1,0 +1,116 @@
+//@version=6
+// ==========================================
+// 📊 RS RATING MODULE (IBD STYLE) - PLUG & PLAY
+// ==========================================
+// Module độc lập để tính và hiển thị RS Rating theo phương pháp William O'Neil
+// Paste đoạn code này vào cuối indicator hiện tại của bạn
+
+// ==========================================
+// 1. SETTINGS (Cấu hình)
+// ==========================================
+grp_rs = "📊 RS Rating (IBD)"
+i_showRS = input.bool(true, "Hiện RS Rating", group=grp_rs)
+i_benchmark = input.symbol("VN:VNINDEX", "Benchmark Index", group=grp_rs, tooltip="Mã chỉ số để so sánh (mặc định VNINDEX)")
+i_rsPosition = input.string("Bottom Left", "Vị trí Dashboard", options=["Top Left", "Top Right", "Bottom Left", "Bottom Right"], group=grp_rs)
+
+// ==========================================
+// 2. TÍNH TOÁN HIỆU SUẤT (PERFORMANCE)
+// ==========================================
+
+// Lấy dữ liệu giá đóng cửa của Benchmark
+benchmarkClose = request.security(i_benchmark, timeframe.period, close)
+
+// Hàm tính % thay đổi giá
+calcPerformance(lookback) =>
+    if bar_index >= lookback
+        currentPrice = close
+        pastPrice = close[lookback]
+        pastPrice != 0 ? ((currentPrice - pastPrice) / pastPrice) * 100 : 0
+    else
+        0
+
+calcBenchmarkPerf(lookback) =>
+    if bar_index >= lookback
+        currentBench = benchmarkClose
+        pastBench = benchmarkClose[lookback]
+        pastBench != 0 ? ((currentBench - pastBench) / pastBench) * 100 : 0
+    else
+        0
+
+// Tính hiệu suất theo các khoảng thời gian (IBD Weighted)
+perf_3m_stock = calcPerformance(63)    // 3 tháng (63 phiên giao dịch)
+perf_6m_stock = calcPerformance(126)   // 6 tháng
+perf_9m_stock = calcPerformance(189)   // 9 tháng
+perf_12m_stock = calcPerformance(252)  // 1 năm
+
+perf_3m_bench = calcBenchmarkPerf(63)
+perf_6m_bench = calcBenchmarkPerf(126)
+perf_9m_bench = calcBenchmarkPerf(189)
+perf_12m_bench = calcBenchmarkPerf(252)
+
+// ==========================================
+// 3. TÍNH RS SCORE (WEIGHTED)
+// ==========================================
+
+// Trọng số IBD: 3m=40%, 6m=20%, 9m=20%, 12m=20%
+weight_3m = 0.40
+weight_6m = 0.20
+weight_9m = 0.20
+weight_12m = 0.20
+
+// Tính điểm trọng số
+stock_weighted = (perf_3m_stock * weight_3m) + (perf_6m_stock * weight_6m) + 
+                 (perf_9m_stock * weight_9m) + (perf_12m_stock * weight_12m)
+
+bench_weighted = (perf_3m_bench * weight_3m) + (perf_6m_bench * weight_6m) + 
+                 (perf_9m_bench * weight_9m) + (perf_12m_bench * weight_12m)
+
+// Tính RS Score (Relative Strength)
+// Công thức proxy: So sánh hiệu suất cổ phiếu vs benchmark
+// Quy về thang điểm 1-99
+rs_diff = stock_weighted - bench_weighted
+
+// Normalize về thang 1-99 (50 là trung bình thị trường)
+// Giả định: +50% outperform = RS 90, -50% underperform = RS 10
+rs_raw = 50 + (rs_diff * 0.8) // Scale factor 0.8 để điều chỉnh độ nhạy
+
+// Giới hạn 1-99
+rs_rating = rs_raw > 99 ? 99 : rs_raw < 1 ? 1 : math.round(rs_raw)
+
+// ==========================================
+// 4. HIỂN THỊ DASHBOARD (MINI TABLE)
+// ==========================================
+
+// Xác định vị trí bảng
+table_position = i_rsPosition == "Top Left" ? position.top_left : 
+                 i_rsPosition == "Top Right" ? position.top_right : 
+                 i_rsPosition == "Bottom Left" ? position.bottom_left : 
+                 position.bottom_right
+
+// Tạo bảng RS Rating
+var table rs_panel = table.new(table_position, 2, 1, border_width=2, force_overlay=true)
+
+if barstate.islast and i_showRS
+    // Xác định màu sắc dựa trên RS Rating
+    rs_color = rs_rating > 90 ? #9C27B0 :  // Tím - Siêu mạnh (>90)
+               rs_rating >= 80 ? color.new(color.green, 0) :  // Xanh lá - Leader (80-90)
+               rs_rating >= 60 ? color.orange :  // Cam - Trung bình (60-80)
+               color.red  // Đỏ - Yếu (<60)
+    
+    rs_category = rs_rating > 90 ? "SIÊU MẠNH 🔥" :
+                  rs_rating >= 80 ? "LEADER 💪" :
+                  rs_rating >= 60 ? "TRUNG BÌNH ⚠️" :
+                  "YẾU 📉"
+    
+    // Hiển thị bảng
+    table.cell(rs_panel, 0, 0, "RS RATING", bgcolor=color.new(color.black, 0), text_color=color.white, text_size=size.small)
+    table.cell(rs_panel, 1, 0, str.tostring(rs_rating) + "\n" + rs_category, 
+               bgcolor=color.new(color.black, 20), 
+               text_color=rs_color, 
+               text_size=size.normal)
+
+// ==========================================
+// 5. PLOT RS LINE (OPTIONAL - TẮT MẶC ĐỊNH)
+// ==========================================
+// Nếu muốn xem đường RS theo thời gian, uncomment dòng dưới:
+// plot(rs_rating, "RS Rating", color=color.new(color.purple, 0), linewidth=2)
