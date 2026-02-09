@@ -851,16 +851,22 @@ if sell_precaution
     bars_since_sell := 0
 
 // ==========================================
-// 9. HIỂN THỊ TÍN HIỆU
+// 9. HIỂN THỊ TÍN HIỆU (TRÊN HISTOGRAM PANE)
 // ==========================================
+// Tín hiệu MUA: Mép dưới cột Histogram
+// Tín hiệu BÁN: Mép trên cột Histogram
+
+// PHE MUA - MÉP DƯỚI
 plotshape(super_buy and not super_buy[1], "Super Buy", shape.labelup, location.bottom, color.yellow, text="💎", size=size.normal)
 plotshape(buy_safe and not super_buy and not buy_safe[1], "Buy Safe", shape.labelup, location.bottom, color.lime, text="MÚC", size=size.small)
-plotshape(buy_early and not buy_safe and not buy_early[1], "Buy Early", shape.triangleup, location.bottom, color.orange, text="SỚM", size=size.small)
-plotshape(sell_sig and not sell_sig[1], "Sell", shape.labeldown, location.top, color.red, text="BÁN", size=size.small)
-plotshape((sell_reversal or sell_precaution) and not (sell_reversal or sell_precaution)[1] and not sell_sig[1], "Sell Precaution", shape.triangledown, location.top, color.orange, text="⚠️", size=size.small)
-plotshape(sell_warning and not sell_sig and not sell_warning[1] and not sell_reversal[1] and not sell_precaution[1], "Bearish Divergence", shape.xcross, location.top, color.fuchsia, text="PK-", size=size.tiny)
+plotshape(buy_early and not buy_safe and not buy_early[1], "Buy Early", shape.triangleup, location.bottom, color.aqua, text="SỚM", size=size.small)
 
-// DAILY DIVERGENCE ALERTS
+// PHE BÁN - MÉP TRÊN
+plotshape(sell_sig and not sell_sig[1], "Sell", shape.labeldown, location.top, color.red, text="BÁN", size=size.small)
+plotshape((sell_reversal or sell_precaution) and not (sell_reversal or sell_precaution)[1] and not sell_sig[1], "Sell Warning", shape.triangledown, location.top, color.orange, text="⚠️", size=size.small)
+plotshape(sell_warning and not sell_sig and not sell_warning[1] and not sell_reversal[1] and not sell_precaution[1], "Bearish Div", shape.xcross, location.top, color.fuchsia, text="PK-", size=size.tiny)
+
+// DAILY DIVERGENCE
 plotshape(regular_bullish_d, "Daily Bull Div", shape.diamond, location.bottom, color.blue, text="D-PK+", size=size.small)
 plotshape(regular_bearish_d, "Daily Bear Div", shape.diamond, location.top, color.fuchsia, text="D-PK-", size=size.small)
 
