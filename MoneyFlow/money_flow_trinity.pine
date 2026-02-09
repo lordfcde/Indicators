@@ -38,6 +38,13 @@ i_volSpikeLb = input.bool(true, "Hiện ⚡ Vol Đột biến", group=grp_displa
 i_volDryLb = input.bool(true, "Hiện 🚦 Vol Cạn kiệt", group=grp_display, tooltip="Volume thấp + Giá đi ngang = Tích lũy")
 i_candleColoring = input.bool(true, "Tô màu nến theo biến động", group=grp_display, tooltip="Nến đậm = biến động mạnh, nến nhạt = biến động yếu")
 i_showOB = input.bool(true, "Hiện 📦 Order Block", group=grp_display, tooltip="Hiển thị vùng Order Block (cản) trên chart")
+i_showFVG = input.bool(true, "Hiện 🟦 Fair Value Gap (FVG)", group=grp_display, tooltip="Vùng mất cân bằng giá (Imbalance)")
+
+// 📈 BỘ LỌC XU HƯỚNG (ADX Filter)
+grp_filter = "📈 Bộ Lọc Xu Hướng"
+i_use_adx_filter = input.bool(true, "Dùng ADX Filter", group=grp_filter, tooltip="Chỉ phát tín hiệu khi ADX > 20 (xu hướng rõ ràng)")
+i_adx_threshold = input.int(20, "Ngưỡng ADX", minval=10, maxval=40, group=grp_filter, tooltip="ADX > ngưỡng này mới cho Mua/Bán")
+i_use_delta_filter = input.bool(true, "Dùng Delta Filter", group=grp_filter, tooltip="Chỉ MUA khi Delta > 0 (phe Mua thắng thế)")
 
 // ==========================================
 // CÀI ĐẶT NỘI BỘ (ẨN)
@@ -76,6 +83,22 @@ dm = ((high + low) / 2) - ((high[1] + low[1]) / 2)
 br = (volume / eom_div) / ((high - low) != 0 ? (high - low) : 1)
 eom_inst = br != 0 ? dm / br : 0
 eom_raw = ta.sma(eom_inst, eom_len)
+
+// ==========================================
+// ACTIVE VOLUME DELTA (Áp lực Mua/Bán nội bộ nến)
+// ==========================================
+buy_pressure = volume * ((close - low) / math.max(high - low, 0.0001))
+sell_pressure = volume - buy_pressure
+vol_delta = buy_pressure - sell_pressure
+vol_delta_positive = vol_delta > 0  // Phe Mua thắng thế
+
+// ==========================================
+// ADX - Average Directional Index (Sức mạnh xu hướng)
+// ==========================================
+adx_len = 14
+[diplus, diminus, adx_val] = ta.dmi(adx_len, adx_len)
+adx_strong = adx_val > i_adx_threshold  // Xu hướng rõ ràng
+adx_very_strong = adx_val > 25
 
 // --- EMAs (Có thể tùy chỉnh) ---
 ema50 = ta.ema(close, ema1_len)
@@ -260,24 +283,25 @@ ob_os := high[ob_length] > ob_upper ? 0 : low[ob_length] < ob_lower ? 1 : ob_os[
 // Volume pivot high
 ob_phv = ta.pivothigh(volume, ob_length, ob_length)
 
-// Bearish Order Block coordinates
+// ==========================================
+// BEARISH ORDER BLOCK (Cản trên - Hộp đỏ)
+// ==========================================
 var bear_ob_top = array.new_float(0)
 var bear_ob_btm = array.new_float(0)
-var bear_ob_time = array.new_int(0)  // Store creation time
+var bear_ob_time = array.new_int(0)
 
-// Detect new Bearish OB (Volume pivot + Downtrend)
+// Detect new Bearish OB (Volume pivot + Downtrend structure)
 is_bearish_ob = not na(ob_phv) and ob_os == 0
 if is_bearish_ob
     array.unshift(bear_ob_top, high[ob_length])
     array.unshift(bear_ob_btm, hl2[ob_length])
-    array.unshift(bear_ob_time, time[ob_length])  // Store the time of OB candle
-    // Keep max 5 OBs
+    array.unshift(bear_ob_time, time[ob_length])
     if array.size(bear_ob_top) > 5
         array.pop(bear_ob_top)
         array.pop(bear_ob_btm)
         array.pop(bear_ob_time)
 
-// Remove mitigated OBs (price > ob_top)
+// Remove mitigated Bearish OBs (price breaks above)
 target_bear_ob = ta.highest(high, ob_length)
 if array.size(bear_ob_top) > 0
     for i = array.size(bear_ob_top) - 1 to 0
@@ -286,18 +310,57 @@ if array.size(bear_ob_top) > 0
             array.remove(bear_ob_btm, i)
             array.remove(bear_ob_time, i)
 
-// Count active Bearish OBs above current price (resistance)
+// Count Bearish OBs above current price (resistance)
 ob_resistance_count = 0
 if array.size(bear_ob_btm) > 0
     for i = 0 to array.size(bear_ob_btm) - 1
         ob_btm = array.get(bear_ob_btm, i)
-        // Price below OB = có cản phía trên
         if close < ob_btm
             ob_resistance_count := ob_resistance_count + 1
 
 has_ob_resistance = ob_resistance_count > 0
 
-// Draw Order Block boxes on chart
+// ==========================================
+// BULLISH ORDER BLOCK (Hỗ trợ dưới - Hộp xanh)
+// ==========================================
+var bull_ob_top = array.new_float(0)
+var bull_ob_btm = array.new_float(0)
+var bull_ob_time = array.new_int(0)
+
+// Detect new Bullish OB (Volume pivot + Uptrend structure)
+// Tìm nến giảm cuối cùng trước khi giá tăng mạnh
+is_bullish_ob = not na(ob_phv) and ob_os == 1
+if is_bullish_ob
+    array.unshift(bull_ob_top, hl2[ob_length])  // Top = mid point
+    array.unshift(bull_ob_btm, low[ob_length])  // Bottom = low of candle
+    array.unshift(bull_ob_time, time[ob_length])
+    if array.size(bull_ob_top) > 5
+        array.pop(bull_ob_top)
+        array.pop(bull_ob_btm)
+        array.pop(bull_ob_time)
+
+// Remove mitigated Bullish OBs (price breaks below)
+target_bull_ob = ta.lowest(low, ob_length)
+if array.size(bull_ob_btm) > 0
+    for i = array.size(bull_ob_btm) - 1 to 0
+        if i < array.size(bull_ob_btm) and target_bull_ob < array.get(bull_ob_btm, i)
+            array.remove(bull_ob_top, i)
+            array.remove(bull_ob_btm, i)
+            array.remove(bull_ob_time, i)
+
+// Count Bullish OBs below current price (support)
+ob_support_count = 0
+if array.size(bull_ob_top) > 0
+    for i = 0 to array.size(bull_ob_top) - 1
+        ob_top_val = array.get(bull_ob_top, i)
+        if close > ob_top_val
+            ob_support_count := ob_support_count + 1
+
+has_ob_support = ob_support_count > 0
+
+// ==========================================
+// DRAW ORDER BLOCK BOXES
+// ==========================================
 var ob_boxes = array.new_box(0)
 var ob_labels = array.new_label(0)
 
@@ -310,15 +373,14 @@ if barstate.isfirst or barstate.islast
     array.clear(ob_boxes)
     array.clear(ob_labels)
 
-// Draw new OB boxes
+// Draw BEARISH OB boxes (Cản trên - Đỏ)
 if barstate.islast and i_showOB and array.size(bear_ob_top) > 0
-    for i = 0 to math.min(4, array.size(bear_ob_top) - 1)  // Max 5 OBs
+    for i = 0 to math.min(4, array.size(bear_ob_top) - 1)
         ob_top_val = array.get(bear_ob_top, i)
         ob_btm_val = array.get(bear_ob_btm, i)
-        ob_time_val = array.get(bear_ob_time, i)  // Get stored OB creation time
+        ob_time_val = array.get(bear_ob_time, i)
         ob_avg_val = math.avg(ob_top_val, ob_btm_val)
         
-        // Draw box starting from OB candle time
         new_box = box.new(ob_time_val, ob_top_val, time, ob_btm_val, 
               xloc=xloc.bar_time,
               border_color=color.new(#ff1100, 60), 
@@ -328,8 +390,7 @@ if barstate.islast and i_showOB and array.size(bear_ob_top) > 0
               force_overlay=true)
         array.push(ob_boxes, new_box)
         
-        // Draw label at current bar
-        new_label = label.new(time, ob_avg_val, "OB", 
+        new_label = label.new(time, ob_avg_val, "OB-", 
               xloc=xloc.bar_time,
               style=label.style_label_left,
               color=color.new(#ff1100, 70),
@@ -337,6 +398,132 @@ if barstate.islast and i_showOB and array.size(bear_ob_top) > 0
               size=size.small,
               force_overlay=true)
         array.push(ob_labels, new_label)
+
+// Draw BULLISH OB boxes (Hỗ trợ dưới - Xanh)
+if barstate.islast and i_showOB and array.size(bull_ob_top) > 0
+    for i = 0 to math.min(4, array.size(bull_ob_top) - 1)
+        ob_top_val = array.get(bull_ob_top, i)
+        ob_btm_val = array.get(bull_ob_btm, i)
+        ob_time_val = array.get(bull_ob_time, i)
+        ob_avg_val = math.avg(ob_top_val, ob_btm_val)
+        
+        new_box = box.new(ob_time_val, ob_top_val, time, ob_btm_val, 
+              xloc=xloc.bar_time,
+              border_color=color.new(#00C853, 60), 
+              bgcolor=color.new(#00C853, 85),
+              border_width=1,
+              extend=extend.right,
+              force_overlay=true)
+        array.push(ob_boxes, new_box)
+        
+        new_label = label.new(time, ob_avg_val, "OB+", 
+              xloc=xloc.bar_time,
+              style=label.style_label_left,
+              color=color.new(#00C853, 70),
+              textcolor=color.white,
+              size=size.small,
+              force_overlay=true)
+        array.push(ob_labels, new_label)
+
+// ==========================================
+// FAIR VALUE GAP (FVG) DETECTION
+// ==========================================
+// Bullish FVG: Gap giữa High[2] và Low (xu hướng tăng)
+// Bearish FVG: Gap giữa Low[2] và High (xu hướng giảm)
+
+var fvg_boxes = array.new_box(0)
+var fvg_labels = array.new_label(0)
+var bull_fvg_top = array.new_float(0)
+var bull_fvg_btm = array.new_float(0)
+var bull_fvg_time = array.new_int(0)
+var bear_fvg_top = array.new_float(0)
+var bear_fvg_btm = array.new_float(0)
+var bear_fvg_time = array.new_int(0)
+
+// Detect Bullish FVG (Gap tăng giá - Low hiện tại > High 2 nến trước)
+is_bullish_fvg = low > high[2] and close > open
+if is_bullish_fvg
+    array.unshift(bull_fvg_top, low)
+    array.unshift(bull_fvg_btm, high[2])
+    array.unshift(bull_fvg_time, time[1])
+    if array.size(bull_fvg_top) > 5
+        array.pop(bull_fvg_top)
+        array.pop(bull_fvg_btm)
+        array.pop(bull_fvg_time)
+
+// Detect Bearish FVG (Gap giảm giá - High hiện tại < Low 2 nến trước)
+is_bearish_fvg = high < low[2] and close < open
+if is_bearish_fvg
+    array.unshift(bear_fvg_top, low[2])
+    array.unshift(bear_fvg_btm, high)
+    array.unshift(bear_fvg_time, time[1])
+    if array.size(bear_fvg_top) > 5
+        array.pop(bear_fvg_top)
+        array.pop(bear_fvg_btm)
+        array.pop(bear_fvg_time)
+
+// Remove mitigated Bullish FVGs (price fills the gap - goes below)
+if array.size(bull_fvg_btm) > 0
+    for i = array.size(bull_fvg_btm) - 1 to 0
+        if i < array.size(bull_fvg_btm) and low < array.get(bull_fvg_btm, i)
+            array.remove(bull_fvg_top, i)
+            array.remove(bull_fvg_btm, i)
+            array.remove(bull_fvg_time, i)
+
+// Remove mitigated Bearish FVGs (price fills the gap - goes above)
+if array.size(bear_fvg_top) > 0
+    for i = array.size(bear_fvg_top) - 1 to 0
+        if i < array.size(bear_fvg_top) and high > array.get(bear_fvg_top, i)
+            array.remove(bear_fvg_top, i)
+            array.remove(bear_fvg_btm, i)
+            array.remove(bear_fvg_time, i)
+
+// Count active FVGs
+fvg_support_count = array.size(bull_fvg_top)
+fvg_resistance_count = array.size(bear_fvg_top)
+
+// Clear old FVG boxes
+if barstate.isfirst or barstate.islast
+    for b in fvg_boxes
+        box.delete(b)
+    for l in fvg_labels
+        label.delete(l)
+    array.clear(fvg_boxes)
+    array.clear(fvg_labels)
+
+// Draw Bullish FVG boxes (Xanh Lime)
+if barstate.islast and i_showFVG and array.size(bull_fvg_top) > 0
+    for i = 0 to math.min(4, array.size(bull_fvg_top) - 1)
+        fvg_top = array.get(bull_fvg_top, i)
+        fvg_btm = array.get(bull_fvg_btm, i)
+        fvg_time = array.get(bull_fvg_time, i)
+        
+        new_fvg = box.new(fvg_time, fvg_top, time, fvg_btm,
+              xloc=xloc.bar_time,
+              border_color=color.new(color.lime, 70),
+              bgcolor=color.new(color.lime, 90),
+              border_width=1,
+              border_style=line.style_dashed,
+              extend=extend.right,
+              force_overlay=true)
+        array.push(fvg_boxes, new_fvg)
+
+// Draw Bearish FVG boxes (Đỏ)
+if barstate.islast and i_showFVG and array.size(bear_fvg_top) > 0
+    for i = 0 to math.min(4, array.size(bear_fvg_top) - 1)
+        fvg_top = array.get(bear_fvg_top, i)
+        fvg_btm = array.get(bear_fvg_btm, i)
+        fvg_time = array.get(bear_fvg_time, i)
+        
+        new_fvg = box.new(fvg_time, fvg_top, time, fvg_btm,
+              xloc=xloc.bar_time,
+              border_color=color.new(color.red, 70),
+              bgcolor=color.new(color.red, 90),
+              border_width=1,
+              border_style=line.style_dashed,
+              extend=extend.right,
+              force_overlay=true)
+        array.push(fvg_boxes, new_fvg)
 
 // ==========================================
 // 4. RSI DIVERGENCE DETECTION
@@ -569,7 +756,13 @@ no_rsi_divergence = not regular_bullish[pivot_lookback] and not hidden_bullish[p
 cloud_support_boost = at_cloud_support and cloudBullish  // Giá chạm hỗ trợ mây xanh
 tk_bullish = conversionLine > baseLine  // Tenkan trên Kijun = đà tăng
 
-buy_safe = cond_cmf_ok and cond_ema_ok and ck_cross_up and cond_cooldown_buy and not is_histogram_green_weakening and histogram_green and histogram_sufficient and no_rsi_divergence
+// ADX + Delta Filter
+adx_filter_passed = (not i_use_adx_filter) or adx_strong  // ADX > 20 hoặc tắt filter
+delta_filter_passed = (not i_use_delta_filter) or vol_delta_positive  // Delta > 0 hoặc tắt filter
+buy_filters_ok = adx_filter_passed and delta_filter_passed  // Cả 2 filter thỏa
+
+// MUA AN TOÀN = Cũ logic + ADX + Delta Filter
+buy_safe = cond_cmf_ok and cond_ema_ok and ck_cross_up and cond_cooldown_buy and not is_histogram_green_weakening and histogram_green and histogram_sufficient and no_rsi_divergence and buy_filters_ok
 
 // KIM CƯƠNG 💎 (MARGIN BUY) - CỰC KỲ CHẶT CHẼ
 // Điều kiện: 
@@ -584,7 +777,8 @@ chaikin_not_high = ck_raw < 0.5 * ta.highest(ck_raw, 20)  // Không ở 50% đ�
 // Cloud Super Buy: Mây xanh + Giá tại hỗ trợ + TK/Kijun bullish
 cloud_super_buy = at_cloud_support and cloudBullish and tk_bullish
 
-super_buy = ((buy_safe and cond_vsa_ok and histogram_strong and (chaikin_cutting_down or chaikin_not_high)) or hidden_bullish[pivot_lookback] or cloud_super_buy) and histogram_strong
+// SUPER BUY = Cũ logic + ADX + Delta Filter
+super_buy = ((buy_safe and cond_vsa_ok and histogram_strong and (chaikin_cutting_down or chaikin_not_high)) or hidden_bullish[pivot_lookback] or cloud_super_buy) and histogram_strong and buy_filters_ok
 
 if buy_safe or super_buy
     bars_since_buy := 0
@@ -608,7 +802,11 @@ cond_cooldown_sell = bars_since_sell >= sell_cooldown
 // Cloud Resistance Sell: Mây đỏ + Giá tại kháng cự + TK/Kijun bearish
 cloud_resistance_sell = at_cloud_resistance and not cloudBullish and not tk_bullish
 
-sell_sig = ((cond_cmf_weak and ck_cross_down) or cond_vsa_sell or regular_bearish[pivot_lookback] or cloud_resistance_sell) and cond_ema_weak and cond_cooldown_sell and not is_histogram_red_weakening
+// ADX Filter cho Bán
+adx_sell_filter = (not i_use_adx_filter) or adx_strong
+
+// BÁN = Cũ logic + ADX Filter (Delta không áp dụng cho bán)
+sell_sig = ((cond_cmf_weak and ck_cross_down) or cond_vsa_sell or regular_bearish[pivot_lookback] or cloud_resistance_sell) and cond_ema_weak and cond_cooldown_sell and not is_histogram_red_weakening and adx_sell_filter
 
 if sell_sig
     bars_since_sell := 0
@@ -727,7 +925,7 @@ rs_rating = rs_raw > 99 ? 99 : rs_raw < 1 ? 1 : math.round(rs_raw)
 // ==========================================
 // 10. DASHBOARD (ĐƠN GIẢN)
 // ==========================================
-var table panel = table.new(position.top_right, 2, 7, border_width=1, force_overlay=true)
+var table panel = table.new(position.top_right, 2, 9, border_width=1, force_overlay=true)
 if barstate.islast
     table.cell(panel, 0, 0, "🔱 TRINITY", bgcolor=color.black, text_color=color.white)
     table.cell(panel, 1, 0, "BY VINH", bgcolor=color.black, text_color=color.yellow)
@@ -747,33 +945,45 @@ if barstate.islast
     table.cell(panel, 0, 3, "Lướt sóng:", bgcolor=color.white, text_halign=text.align_left)
     table.cell(panel, 1, 3, above_ema50 ? "OK ✅" : "DƯỚI ❌",text_color=above_ema50 ? color.green : color.red)
     
-    // Cản trên (Order Block + Cloud Resistance)
-    table.cell(panel, 0, 4, "Cản trên:", bgcolor=color.white, text_halign=text.align_left)
+    // Order Block Analysis Row
+    table.cell(panel, 0, 4, "Order Block:", bgcolor=color.white, text_halign=text.align_left)
     
-    // Tích hợp cloud resistance vào chỉ báo cản trên
     has_cloud_resistance = at_cloud_resistance and not cloudBullish
+    has_cloud_support_indicator = at_cloud_support and cloudBullish
     
-    // Khai báo biến trước để tránh lỗi scope
-    res_text = ""
-    res_color = color.gray
+    // Build OB status text
+    ob_text = ""
+    ob_color = color.gray
     
-    if ob_resistance_count == 0 and not has_cloud_resistance
-        res_text := "KHÔNG CÓ 🆓"
-        res_color := color.green
-    else if ob_resistance_count == 0 and has_cloud_resistance
-        res_text := "☁️ CLOUD ⚠️"
-        res_color := color.orange
-    else if ob_resistance_count == 1 and not has_cloud_resistance
-        res_text := "1 OB ⚠️"
-        res_color := color.orange
-    else if ob_resistance_count == 1 and has_cloud_resistance
-        res_text := "OB+☁️ ❌"
-        res_color := color.red
+    if ob_resistance_count == 0 and ob_support_count == 0
+        ob_text := "KHÔNG CÓ 🆓"
+        ob_color := color.gray
+    else if ob_support_count > 0 and ob_resistance_count == 0
+        // Chỉ có hỗ trợ = tốt
+        ob_text := str.tostring(ob_support_count) + " HỖ TRỢ ✅"
+        ob_color := color.green
+    else if ob_resistance_count > 0 and ob_support_count == 0
+        // Chỉ có cản = xấu
+        ob_text := str.tostring(ob_resistance_count) + " CẢN ❌"
+        ob_color := color.red
     else
-        res_text := str.tostring(ob_resistance_count) + " OB" + (has_cloud_resistance ? "+☁️" : "") + " ❌"
-        res_color := color.red
+        // Có cả hai - tính Net
+        net_ob = ob_support_count - ob_resistance_count
+        if net_ob > 0
+            ob_text := "HỖ TRỢ " + str.tostring(ob_support_count) + " | CẢN " + str.tostring(ob_resistance_count) + " ✅"
+            ob_color := color.green
+        else if net_ob < 0
+            ob_text := "CẢN " + str.tostring(ob_resistance_count) + " | HỖ TRỢ " + str.tostring(ob_support_count) + " ❌"
+            ob_color := color.red
+        else
+            ob_text := "CÂN BẰNG ⚖️"
+            ob_color := color.orange
     
-    table.cell(panel, 1, 4, res_text, text_color=res_color)
+    // Add cloud status if applicable
+    if has_cloud_resistance
+        ob_text := ob_text + " ☁️"
+    
+    table.cell(panel, 1, 4, ob_text, text_color=ob_color)
     
     // Gợi ý (Recommendation) - Tích hợp cloud support vào logic
     table.cell(panel, 0, 5, "GỢI Ý:", bgcolor=color.gray, text_halign=text.align_left, text_color=color.white)
@@ -794,19 +1004,59 @@ if barstate.islast
     else if is_choppy_market
         rec_text := "QUAN SÁT 🔄"
         rec_bg := color.gray
-    // ƯU TIÊN 4: Dòng tiền vào mạnh 3+ phiên + UPTREND + GIÁ TRÊN EMA50 → MUA MARGIN (An toàn nhất)
-    else if is_critical_inflow and is_confirmed_uptrend and above_ema50
+    
+    // ==========================================
+    // ƯU TIÊN 3B: ADX > 50 = VÙNG QUÁ TỐC ⚠️
+    // Dù Uptrend hay Downtrend, ADX > 50 đều nguy hiểm
+    // ==========================================
+    else if adx_val > 50 and is_confirmed_uptrend
+        // BUYING CLIMAX - Phe mua đang hưng phấn tột độ
+        rec_text := "⚠️ GIỮ LÃI (ADX QUÁ NÓNG)"
+        rec_bg := color.orange
+    else if adx_val > 50 and is_confirmed_downtrend
+        // SELLING CLIMAX - Phe bán đang hoảng loạn
+        rec_text := "⛔ CHỜ HỒI (ADX PANIC)"
+        rec_bg := color.maroon
+    else if adx_val > 50
+        // ADX quá cao nhưng chưa rõ hướng
+        rec_text := "⚠️ CẢNH BÁO (ADX>50)"
+        rec_bg := color.orange
+    
+    // ==========================================
+    // ƯU TIÊN 4: MUA MARGIN 🚀 (CỰC KỲ KHẮT KHE)
+    // ADX phải trong vùng 25-50 (không quá nóng)
+    // 1. Dòng tiền: Vào mạnh
+    // 2. Xu hướng: Uptrend + Trên EMA50
+    // 3. ADX: 25 < ADX <= 50 (vùng kiếm tiền)
+    // 4. Delta > 0 (phe Mua thắng)
+    // 5. RS > 60 (nếu bật RS)
+    // ==========================================
+    else if (is_critical_inflow or is_strong_inflow) and is_confirmed_uptrend and above_ema50 and adx_val > 25 and adx_val <= 50 and vol_delta_positive and (not i_showRS or rs_rating > 60)
         rec_text := "MUA MARGIN 🚀"
         rec_bg := color.teal
-    // ƯU TIÊN 5: Dòng tiền vào mạnh (3+ phiên chưa uptrend HOẶC 1 phiên + uptrend) + GIÁ TRÊN EMA50 → MUA MẠNH
-    else if (is_critical_inflow or (is_strong_inflow and is_confirmed_uptrend)) and above_ema50
+    
+    // ==========================================
+    // ƯU TIÊN 5: MUA MẠNH 💪 (Khắt khe vừa)
+    // Dòng tiền vào + Uptrend + Trên EMA50 + Delta > 0
+    // (Thiếu ADX hoặc RS)
+    // ==========================================
+    else if (is_critical_inflow or is_strong_inflow) and is_confirmed_uptrend and above_ema50 and vol_delta_positive
         rec_text := "MUA MẠNH 💪"
         rec_bg := color.lime
-    // ƯU TIÊN 5B: Dòng tiền vào mạnh NHƯNG GIÁ DƯỚI EMA50 (downtrend/sideway) → QUAN SÁT (không mua)
+    
+    // ==========================================
+    // ƯU TIÊN 5B: Dòng tiền vào mạnh nhưng thiếu điều kiện
+    // ==========================================
+    else if (is_critical_inflow or is_strong_inflow) and above_ema50
+        rec_text := "MUA 1 PHẦN 👍"
+        rec_bg := color.green
+    
+    // ƯU TIÊN 5C: Dòng tiền vào mạnh NHƯNG GIÁ DƯỚI EMA50 → QUAN SÁT
     else if is_critical_inflow and not above_ema50
         rec_text := "QUAN SÁT 👀"
         rec_bg := color.gray
-    // ƯU TIÊN 6: Dòng tiền vào nhẹ + (Lướt sóng OK hoặc Vào nhẹ 2+ phiên) + giá trên EMA233 → MUA 1 PHẦN
+    
+    // ƯU TIÊN 6: Dòng tiền vào nhẹ + Lướt sóng OK + giá trên EMA233 → MUA 1 PHẦN
     else if is_light_inflow and above_ema233 and (above_ema50 or is_confirmed_light_inflow)
         rec_text := "MUA 1 PHẦN 👍"
         rec_bg := color.green
@@ -832,9 +1082,58 @@ if barstate.islast
     
     table.cell(panel, 1, 5, rec_text, bgcolor=rec_bg, text_color=color.white)
     
-    // 📊 RS RATING (IBD) - ROW 6
+    // 📈 ADX (Sức mạnh xu hướng + Vùng) - ROW 6
+    table.cell(panel, 0, 6, "📈 ADX:", bgcolor=color.white, text_halign=text.align_left)
+    
+    // Logic ADX theo vùng: <20 Yếu | 25-50 Kiếm tiền | >50 Nguy hiểm
+    adx_text = ""
+    adx_color = color.gray
+    
+    if adx_val > 50 and is_confirmed_uptrend
+        // BUYING CLIMAX - Quá nóng, cẩn thận đảo chiều
+        adx_text := "🔥 " + str.tostring(math.round(adx_val)) + " QUÁ NÓNG (TĂNG) ⚠️"
+        adx_color := color.orange
+    else if adx_val > 50 and is_confirmed_downtrend
+        // SELLING CLIMAX - Hoảng loạn, có thể hồi
+        adx_text := "🩸 " + str.tostring(math.round(adx_val)) + " PANIC (GIẢM) ⛔"
+        adx_color := color.maroon
+    else if adx_val > 50
+        // Quá tốc chưa rõ hướng
+        adx_text := "⚠️ " + str.tostring(math.round(adx_val)) + " QUÁ TỐC"
+        adx_color := color.orange
+    else if adx_val > 25 and is_confirmed_uptrend
+        // VÙNG KIẾM TIỀN - Uptrend = Tích cực
+        adx_text := "🟢 " + str.tostring(math.round(adx_val)) + " MẠNH (TĂNG) 🚀"
+        adx_color := color.green
+    else if adx_val > 25 and is_confirmed_downtrend
+        // VÙNG KIẾM TIỀN nhưng Downtrend = Cảnh báo
+        adx_text := "🔴 " + str.tostring(math.round(adx_val)) + " MẠNH (GIẢM) 🩸"
+        adx_color := color.red
+    else if adx_val > 25
+        // Mạnh nhưng chưa rõ hướng
+        adx_text := "🟡 " + str.tostring(math.round(adx_val)) + " MẠNH ⚡"
+        adx_color := color.orange
+    else if adx_val >= 20
+        // Vừa đủ
+        adx_text := "⚪ " + str.tostring(math.round(adx_val)) + " ĐỦ ✅"
+        adx_color := color.orange
+    else
+        // Sideway - yếu
+        adx_text := "⚪ " + str.tostring(math.round(adx_val)) + " YẾU/SIDEWAY 💤"
+        adx_color := color.gray
+    
+    table.cell(panel, 1, 6, adx_text, text_color=adx_color)
+    
+    // Δ DELTA VOL (Mua/Bán chủ động) - ROW 7
+    table.cell(panel, 0, 7, "Δ Delta:", bgcolor=color.white, text_halign=text.align_left)
+    delta_formatted = vol_delta > 0 ? "+" + str.tostring(math.round(vol_delta), "#,###") : str.tostring(math.round(vol_delta), "#,###")
+    delta_text = vol_delta > 0 ? delta_formatted + " MUA 🟢" : delta_formatted + " BÁN 🔴"
+    delta_color = vol_delta > 0 ? color.green : color.red
+    table.cell(panel, 1, 7, delta_text, text_color=delta_color)
+    
+    // �📊 RS RATING (IBD) - ROW 8
     if i_showRS
-        table.cell(panel, 0, 6, "📊 RS:", bgcolor=color.white, text_halign=text.align_left)
+        table.cell(panel, 0, 8, "📊 RS:", bgcolor=color.white, text_halign=text.align_left)
         
         // Màu sắc RS Rating
         rs_color = rs_rating > 90 ? #9C27B0 : 
@@ -847,7 +1146,7 @@ if barstate.islast
                       rs_rating >= 80 ? "💪" : 
                       rs_rating >= 60 ? "⚠️" : "📉")
         
-        table.cell(panel, 1, 6, rs_display, text_color=rs_color)
+        table.cell(panel, 1, 8, rs_display, text_color=rs_color)
 
 // ==========================================
 // ALERTS
