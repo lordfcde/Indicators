@@ -1,15 +1,14 @@
 //@version=6
-// Coder Stock - Money Flow Trinity Strategy (Updated with Latest Logic)
+// Coder Stock - Money Flow Trinity Strategy (Full Features)
 // Author: Vinh
+// Features: Volume Delta, ADX Filter, FVG, Order Block, Strict Buy Logic
 strategy(title="CS Trinity Master Strategy", shorttitle="CS Trinity Strat", overlay=true, 
          initial_capital=100000000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, 
          commission_type=strategy.commission.percent, commission_value=0.15, pyramiding=0)
 
 // ==========================================
-// SETTINGS
+// 1. CẤU HÌNH NGƯỜI DÙNG
 // ==========================================
-
-// EMA Settings
 grp_ema = "📈 EMA Settings"
 ema1_len = input.int(50, "EMA Ngắn hạn (Lướt sóng)", group=grp_ema)
 ema2_len = input.int(144, "EMA Trung hạn", group=grp_ema)
@@ -20,16 +19,23 @@ i_showIchimoku = input.bool(true, "Hiện Ichimoku Cloud")
 
 // RS Rating (IBD Style)
 grp_rs = "📊 RS Rating (IBD)"
-i_showRS = input.bool(false, "Show RS Dashboard", group=grp_rs, tooltip="Hiện bảng RS Rating trên góc chart")
-i_benchmark = input.symbol("VNINDEX", "Benchmark Index", group=grp_rs, tooltip="Chỉ số để so sánh (VNINDEX, VN30, SPX...)")
+i_showRS = input.bool(false, "Show RS Dashboard", group=grp_rs)
+i_benchmark = input.symbol("VNINDEX", "Benchmark Index", group=grp_rs)
 
 // Display
 grp_display = "🎨 Hiển Thị"
-i_showHistogram = input.bool(true, "Hiện 📊 Money Flow Histogram", group=grp_display, tooltip="Histogram thể hiện dòng tiền (xanh=mua, đỏ=bán)")
-i_volSpikeLb = input.bool(true, "Hiện ⚡ Vol Đột biến", group=grp_display, tooltip="Volume cao gấp 2.5x MA20 + Giá biến động mạnh")
-i_volDryLb = input.bool(true, "Hiện 🚦 Vol Cạn kiệt", group=grp_display, tooltip="Volume thấp + Giá đi ngang = Tích lũy")
-i_candleColoring = input.bool(true, "Tô màu nến theo biến động", group=grp_display, tooltip="Nến đậm = biến động mạnh, nến nhạt = biến động yếu")
-i_showOB = input.bool(true, "Hiện 📦 Order Block", group=grp_display, tooltip="Hiển thị vùng Order Block (cản) trên chart")
+i_showHistogram = input.bool(true, "Hiện 📊 Money Flow Histogram", group=grp_display)
+i_volSpikeLb = input.bool(true, "Hiện ⚡ Vol Đột biến", group=grp_display)
+i_volDryLb = input.bool(true, "Hiện 🚦 Vol Cạn kiệt", group=grp_display)
+i_candleColoring = input.bool(true, "Tô màu nến theo biến động", group=grp_display)
+i_showOB = input.bool(true, "Hiện 📦 Order Block", group=grp_display)
+i_showFVG = input.bool(true, "Hiện 🟦 Fair Value Gap (FVG)", group=grp_display)
+
+// 📈 BỘ LỌC XU HƯỚNG (ADX Filter)
+grp_filter = "📈 Bộ Lọc Xu Hướng"
+i_use_adx_filter = input.bool(true, "Dùng ADX Filter", group=grp_filter, tooltip="Chỉ phát tín hiệu khi ADX > 20")
+i_adx_threshold = input.int(20, "Ngưỡng ADX", minval=10, maxval=40, group=grp_filter)
+i_use_delta_filter = input.bool(true, "Dùng Delta Filter", group=grp_filter, tooltip="Chỉ MUA khi Delta > 0")
 
 // Risk Management
 grp_risk = "💰 Quản Lý Vốn"
@@ -43,8 +49,6 @@ cmf_len = 20
 ck_fast = 3
 ck_slow = 10
 vol_spike_threshold = 2.5
-atr_mult_threshold = 2.0
-ob_lookback = 20
 
 // Ichimoku parameters
 conversionPeriods = 9
@@ -54,25 +58,40 @@ displacement = 26
 cloudSupportThreshold = 0.003
 
 // ==========================================
-// CALCULATIONS
+// 2. TÍNH TOÁN CORE
 // ==========================================
 
-// CMF (Chaikin Money Flow)
+// --- CMF ---
 ad_val = close==high and close==low or high==low ? 0 : ((2*close-low-high)/(high-low))*volume
 mf = math.sum(ad_val, cmf_len) / math.sum(volume, cmf_len)
 
-// Chaikin Oscillator
-ad_line = ta.cum(ad_val)
-ck_fast_ema = ta.ema(ad_line, ck_fast)
-ck_slow_ema = ta.ema(ad_line, ck_slow)
-ck_raw = ck_fast_ema - ck_slow_ema
+// --- Chaikin ---
+ad_line = ta.accdist
+ck_raw = ta.ema(ad_line, ck_fast) - ta.ema(ad_line, ck_slow)
 
 // Normalize Chaikin for visualization
 price_range = ta.highest(high, 100) - ta.lowest(low, 100)
 scaler = price_range * 0.05
 ck_visual = ck_raw / (scaler != 0 ? scaler : 1)
 
-// EMAs
+// ==========================================
+// ACTIVE VOLUME DELTA (Áp lực Mua/Bán)
+// ==========================================
+buy_pressure = volume * ((close - low) / math.max(high - low, 0.0001))
+sell_pressure = volume - buy_pressure
+vol_delta = buy_pressure - sell_pressure
+vol_delta_positive = vol_delta > 0  // Phe Mua thắng thế
+
+// ==========================================
+// ADX - Average Directional Index
+// ==========================================
+adx_len = 14
+[diplus, diminus, adx_val] = ta.dmi(adx_len, adx_len)
+adx_strong = adx_val > i_adx_threshold  // Xu hướng rõ ràng
+adx_very_strong = adx_val > 25
+adx_overheated = adx_val > 50  // Quá nóng - Nguy hiểm
+
+// --- EMAs ---
 ema50 = ta.ema(close, ema1_len)
 ema144 = ta.ema(close, ema2_len)
 ema233 = ta.ema(close, ema3_len)
@@ -81,12 +100,11 @@ above_ema50 = close > ema50
 above_ema144 = close > ema144
 above_ema233 = close > ema233
 
-// Trend Detection
 ema_count_above = (above_ema50 ? 1 : 0) + (above_ema144 ? 1 : 0) + (above_ema233 ? 1 : 0)
 is_confirmed_uptrend = ema_count_above >= 2
 is_confirmed_downtrend = ema_count_above == 0
 
-// Ichimoku Cloud
+// --- Ichimoku Cloud ---
 donchian(len) => math.avg(ta.lowest(len), ta.highest(len))
 conversionLine = donchian(conversionPeriods)
 baseLine = donchian(basePeriods)
@@ -105,19 +123,20 @@ at_cloud_support = not na(distance_to_cloud_support) and distance_to_cloud_suppo
 distance_to_cloud_resistance = not cloudBullish and close < cloudTop ? (cloudTop - close) / close : na
 at_cloud_resistance = not na(distance_to_cloud_resistance) and distance_to_cloud_resistance <= cloudSupportThreshold
 
-// RSI
+// --- RSI ---
 rsi_val = ta.rsi(close, 14)
 rsi_overbought = rsi_val > 70
 rsi_oversold = rsi_val < 30
 
-// Volume Analysis
+// --- Volume Analysis ---
 vol_ma20 = ta.sma(volume, 20)
-vol_spike = volume > vol_ma20 * vol_spike_threshold
+vol_ratio = volume / vol_ma20
+vol_spike = vol_ratio >= vol_spike_threshold
+vol_dry = vol_ratio < 0.5
 
 // ==========================================
-// RS RATING (IBD STYLE) - CALCULATION
+// RS RATING (IBD STYLE)
 // ==========================================
-
 benchmarkClose = request.security(i_benchmark, timeframe.period, close)
 
 calcPerformance(lookback) =>
@@ -180,13 +199,44 @@ is_strong_outflow = mf < -0.05
 is_choppy_market = math.abs(mf) < 0.02 and not vol_spike
 
 // ==========================================
-// STRATEGY SIGNALS
+// ADX + DELTA FILTERS
+// ==========================================
+adx_filter_passed = (not i_use_adx_filter) or adx_strong
+delta_filter_passed = (not i_use_delta_filter) or vol_delta_positive
+buy_filters_ok = adx_filter_passed and delta_filter_passed
+
+// ADX trong vùng kiếm tiền (25-50)
+adx_in_profit_zone = adx_val > 25 and adx_val <= 50
+
+// ==========================================
+// STRATEGY SIGNALS (KỶ LUẬT THÉP)
 // ==========================================
 
-// BUY CONDITIONS (Require above_ema50 for ALL signals - NO EXCEPTION)
-strong_buy_condition = is_critical_inflow and is_confirmed_uptrend and above_ema50
-buy_condition = is_strong_inflow and above_ema50 and above_ema233
-early_buy_condition = is_light_inflow and above_ema50 and above_ema233 and rsi_oversold and at_cloud_support
+// MUA MARGIN 🚀 (CỰC KỲ KHẮT KHE)
+// 1. Dòng tiền: Vào mạnh
+// 2. Xu hướng: Uptrend + Trên EMA50
+// 3. ADX: 25 < ADX <= 50 (vùng kiếm tiền)
+// 4. Delta > 0 (phe Mua thắng)
+// 5. RS > 60 (nếu bật RS)
+margin_buy_condition = (is_critical_inflow or is_strong_inflow) and 
+                       is_confirmed_uptrend and above_ema50 and 
+                       adx_in_profit_zone and vol_delta_positive and 
+                       (not i_showRS or rs_rating > 60)
+
+// MUA MẠNH 💪 (Thiếu ADX hoặc RS)
+strong_buy_condition = (is_critical_inflow or is_strong_inflow) and 
+                       is_confirmed_uptrend and above_ema50 and 
+                       vol_delta_positive and buy_filters_ok
+
+// MUA THƯỜNG 👍
+normal_buy_condition = is_strong_inflow and above_ema50 and above_ema233 and buy_filters_ok
+
+// MUA SỚM ⚡ (Thăm dò)
+early_buy_condition = is_light_inflow and above_ema50 and above_ema233 and 
+                      rsi_oversold and at_cloud_support and buy_filters_ok
+
+// CẢNH BÁO: ADX > 50 = Không mua mới
+adx_danger_zone = adx_overheated
 
 // SELL CONDITIONS
 strong_sell_condition = is_critical_outflow
@@ -196,31 +246,27 @@ sell_condition = is_strong_outflow or (not above_ema50 and is_confirmed_downtren
 // STRATEGY EXECUTION
 // ==========================================
 
-if strategy.position_size == 0
-    if strong_buy_condition
-        strategy.entry("Long", strategy.long, comment="💎 MUA MẠNH")
-    else if buy_condition
+if strategy.position_size == 0 and not adx_danger_zone
+    if margin_buy_condition
+        strategy.entry("Long", strategy.long, comment="💎 MARGIN")
+    else if strong_buy_condition
+        strategy.entry("Long", strategy.long, comment="💪 MUA MẠNH")
+    else if normal_buy_condition
         strategy.entry("Long", strategy.long, comment="✅ MUA")
     else if early_buy_condition
         strategy.entry("Long", strategy.long, comment="⚡ SỚM")
 
 // Exit Logic - Trailing chỉ khi lãi > 15%
 if strategy.position_size > 0
-    // Tính % lãi hiện tại
     current_profit_pct = (close - strategy.position_avg_price) / strategy.position_avg_price * 100
-    
-    // Stop Loss cố định
     stop_price = strategy.position_avg_price * (1 - sl_pct/100)
     
-    // Chỉ bật trailing khi lãi >= 15%
     if current_profit_pct >= tp1_pct and use_trailing
-        // Trailing Stop (5% từ đỉnh)
         trail_points = close * trail_pct / 100 / syminfo.mintick
         strategy.exit("Trail", from_entry="Long", 
                      trail_points=trail_points, trail_offset=trail_points, 
                      stop=stop_price, comment="Trailing")
     else
-        // Chưa đủ lãi 15% → Chỉ SL cố định
         strategy.exit("SL", from_entry="Long", stop=stop_price, comment="Stop Loss")
 
 // Exit khi có sell signal mạnh
@@ -248,7 +294,7 @@ fill(p1, p2, color=i_showIchimoku ? (cloudBullish ? color.new(color.green, 85) :
 
 // Volume Signals
 plotshape(i_volSpikeLb and vol_spike, "⚡ Vol Spike", shape.diamond, location.abovebar, color.yellow, text="⚡", size=size.tiny, force_overlay=true)
-plotshape(i_volDryLb and volume < vol_ma20 * 0.5, "🚦 Vol Dry", shape.circle, location.belowbar, color.lime, text="🚦", size=size.tiny, force_overlay=true)
+plotshape(i_volDryLb and vol_dry, "🚦 Vol Dry", shape.circle, location.belowbar, color.lime, text="🚦", size=size.tiny, force_overlay=true)
 
 // Candle Coloring
 candle_color = i_candleColoring ? 
@@ -261,9 +307,9 @@ barcolor(candle_color)
 bgcolor(strategy.position_size > 0 ? color.new(color.green, 90) : na)
 
 // ==========================================
-// DASHBOARD
+// DASHBOARD (Mở rộng)
 // ==========================================
-var table panel = table.new(position.top_right, 2, i_showRS ? 8 : 7, border_width=1, force_overlay=true)
+var table panel = table.new(position.top_right, 2, 10, border_width=1, force_overlay=true)
 if barstate.islast
     table.cell(panel, 0, 0, "🐋 TRINITY", bgcolor=color.black, text_color=color.white)
     table.cell(panel, 1, 0, "BY VINH", bgcolor=color.black, text_color=color.yellow)
@@ -290,27 +336,60 @@ if barstate.islast
     surf_color = above_ema50 ? color.green : color.red
     table.cell(panel, 1, 3, surf_text, text_color=surf_color)
     
+    // ADX (Sức mạnh xu hướng + Vùng)
+    table.cell(panel, 0, 4, "📈 ADX:", bgcolor=color.white, text_halign=text.align_left)
+    adx_text = ""
+    adx_color = color.gray
+    
+    if adx_val > 50 and is_confirmed_uptrend
+        adx_text := "🔥 " + str.tostring(math.round(adx_val)) + " QUÁ NÓNG ⚠️"
+        adx_color := color.orange
+    else if adx_val > 50 and is_confirmed_downtrend
+        adx_text := "🩸 " + str.tostring(math.round(adx_val)) + " PANIC ⛔"
+        adx_color := color.maroon
+    else if adx_val > 25 and is_confirmed_uptrend
+        adx_text := "🟢 " + str.tostring(math.round(adx_val)) + " MẠNH (TĂNG) 🚀"
+        adx_color := color.green
+    else if adx_val > 25 and is_confirmed_downtrend
+        adx_text := "🔴 " + str.tostring(math.round(adx_val)) + " MẠNH (GIẢM) 🩸"
+        adx_color := color.red
+    else if adx_val >= 20
+        adx_text := "⚪ " + str.tostring(math.round(adx_val)) + " ĐỦ ✅"
+        adx_color := color.orange
+    else
+        adx_text := "⚪ " + str.tostring(math.round(adx_val)) + " YẾU 💤"
+        adx_color := color.gray
+    
+    table.cell(panel, 1, 4, adx_text, text_color=adx_color)
+    
+    // Delta Vol
+    table.cell(panel, 0, 5, "Δ Delta:", bgcolor=color.white, text_halign=text.align_left)
+    delta_formatted = vol_delta > 0 ? "+" + str.tostring(math.round(vol_delta), "#,###") : str.tostring(math.round(vol_delta), "#,###")
+    delta_text = vol_delta > 0 ? delta_formatted + " MUA 🟢" : delta_formatted + " BÁN 🔴"
+    delta_color = vol_delta > 0 ? color.green : color.red
+    table.cell(panel, 1, 5, delta_text, text_color=delta_color)
+    
     // Position
-    table.cell(panel, 0, 4, "Vị thế:", bgcolor=color.white, text_halign=text.align_left)
+    table.cell(panel, 0, 6, "Vị thế:", bgcolor=color.white, text_halign=text.align_left)
     pos_text = strategy.position_size > 0 ? "GIỮ 📈" : "NGOÀI"
     pos_color = strategy.position_size > 0 ? color.green : color.gray
-    table.cell(panel, 1, 4, pos_text, text_color=pos_color)
+    table.cell(panel, 1, 6, pos_text, text_color=pos_color)
     
     // Win Rate
     total = strategy.wintrades + strategy.losstrades
     wr = total > 0 ? strategy.wintrades / total * 100 : 0
-    table.cell(panel, 0, 5, "Win Rate:", bgcolor=color.white, text_halign=text.align_left)
-    table.cell(panel, 1, 5, str.tostring(wr, "#.#") + "%", text_color=wr > 50 ? color.green : color.red)
+    table.cell(panel, 0, 7, "Win Rate:", bgcolor=color.white, text_halign=text.align_left)
+    table.cell(panel, 1, 7, str.tostring(wr, "#.#") + "%", text_color=wr > 50 ? color.green : color.red)
     
     // P&L
     pnl = strategy.netprofit / strategy.initial_capital * 100
-    table.cell(panel, 0, 6, "P&L:", bgcolor=color.white, text_halign=text.align_left)
-    table.cell(panel, 1, 6, str.tostring(pnl, "#.#") + "%", text_color=pnl > 0 ? color.green : color.red)
+    table.cell(panel, 0, 8, "P&L:", bgcolor=color.white, text_halign=text.align_left)
+    table.cell(panel, 1, 8, str.tostring(pnl, "#.#") + "%", text_color=pnl > 0 ? color.green : color.red)
     
     // RS Rating (Optional)
     if i_showRS
-        table.cell(panel, 0, 7, "📊 RS:", bgcolor=color.white, text_halign=text.align_left)
+        table.cell(panel, 0, 9, "📊 RS:", bgcolor=color.white, text_halign=text.align_left)
         rs_category = rs_rating > 80 ? "LEADER" : rs_rating >= 60 ? "AVERAGE" : "WEAK"
         rs_color = rs_rating > 80 ? color.green : rs_rating >= 60 ? color.orange : color.red
         rs_display = str.tostring(rs_rating) + " (" + rs_category + ")"
-        table.cell(panel, 1, 7, rs_display, text_color=rs_color)
+        table.cell(panel, 1, 9, rs_display, text_color=rs_color)
